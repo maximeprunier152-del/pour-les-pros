@@ -1172,6 +1172,13 @@ function toast(icon,txt){
 }
 function f(n){return(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ══ INIT ══
+document.addEventListener('DOMContentLoaded', () => {
+  renderDash();
+  renderCat();
+  renderCatChips();
+});
 </script>
 </body>
 </html>
