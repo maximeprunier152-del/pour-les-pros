@@ -788,23 +788,24 @@ let devis = null;
 let recording = false;
 let recognition = null;
 
-let catalogue = [
-  {id:1,name:"Main d'œuvre",prix:55,unit:"heure",cat:"Main d'œuvre"},
-  {id:2,name:"Déplacement",prix:30,unit:"forfait",cat:"Déplacement"},
-  {id:3,name:"Chauffe-eau 200L",prix:420,unit:"unité",cat:"Matériel"},
-  {id:4,name:"Tableau électrique",prix:380,unit:"unité",cat:"Matériel"},
-  {id:5,name:"Pose parquet",prix:45,unit:"m²",cat:"Pose"},
-  {id:6,name:"Peinture",prix:18,unit:"m²",cat:"Pose"},
-];
+// ══ PERSISTANCE localStorage ══
+function saveData() {
+  try {
+    localStorage.setItem('devisIA_catalogue', JSON.stringify(catalogue));
+    localStorage.setItem('devisIA_history', JSON.stringify(history));
+  } catch(e) {}
+}
+function loadData() {
+  try {
+    const c = localStorage.getItem('devisIA_catalogue');
+    const h = localStorage.getItem('devisIA_history');
+    if (c) catalogue = JSON.parse(c);
+    if (h) history = JSON.parse(h);
+  } catch(e) {}
+}
 
-let history = [
-  {id:"DEV-2025-089",client:"M. Dupont",desc:"Remplacement chauffe-eau",ttc:676.50,date:"03/04/2025",status:"signe",email:"dupont@mail.fr"},
-  {id:"DEV-2025-090",client:"Mme Martin",desc:"Tableau électrique",ttc:528.00,date:"05/04/2025",status:"ouvert",email:"martin@mail.fr"},
-  {id:"DEV-2025-091",client:"M. Leblanc",desc:"Parquet 25m²",ttc:1320.00,date:"06/04/2025",status:"envoye",email:"leblanc@mail.fr"},
-  {id:"DEV-2025-092",client:"SCI Horizon",desc:"Rénovation salle de bain",ttc:2860.00,date:"07/04/2025",status:"signe",email:"sci@mail.fr"},
-  {id:"DEV-2025-093",client:"Mme Roux",desc:"Dépannage plomberie",ttc:198.00,date:"01/04/2025",status:"attente",email:"roux@mail.fr"},
-  {id:"DEV-2025-094",client:"M. Girard",desc:"Peinture chambre",ttc:440.00,date:"29/03/2025",status:"relance",email:"girard@mail.fr"},
-];
+let catalogue = [];
+let history = [];
 
 // ══ NAV ══
 function goPage(p) {
@@ -932,7 +933,7 @@ async function generer() {
 
   renderDoc(devis);
   btn.disabled=false; btn.innerHTML='<span>↻</span> Regénérer';
-  history.unshift({id:num,client:data.cli||'Client',desc:devis.objet.slice(0,40),ttc,date:now.toLocaleDateString('fr-FR'),status:'attente',email:data.email});
+  history.unshift({id:num,client:data.cli||'Client',desc:devis.objet.slice(0,40),ttc,date:now.toLocaleDateString('fr-FR'),status:'attente',email:data.email}); saveData();
 }
 
 function getData() {
@@ -1087,7 +1088,7 @@ function openEmailModal() {
   document.getElementById('m-email').classList.add('open');
 }
 function doSendEmail() {
-  const h=history.find(x=>x.id===devis?.num); if(h) h.status='envoye';
+  const h=history.find(x=>x.id===devis?.num); if(h) h.status='envoye'; saveData();
   closeModals(); toast('✉️','Devis envoyé par email !');
   setTimeout(()=>toast('🔔','Relance programmée dans 3 jours'),2200);
 }
@@ -1104,7 +1105,7 @@ function doSign() {
   devis.signed=true;
   const sc=document.getElementById('sign-cli');
   if(sc){sc.innerHTML=`<div class="sign-name">${devis.cli}</div><div class="sign-date">Signé le ${devis.date}</div>`;sc.classList.add('show');}
-  const h=history.find(x=>x.id===devis.num); if(h) h.status='signe';
+  const h=history.find(x=>x.id===devis.num); if(h) h.status='signe'; saveData();
   toast('✍️',`Signé par ${devis.cli}`);
 }
 
@@ -1138,7 +1139,7 @@ function renderDash() {
     <td><span class="badge ${SC[d.status]}">${SL[d.status]}</span></td>
   </tr>`).join('');
 }
-function doRelance(id){const d=history.find(x=>x.id===id);if(d)d.status='envoye';renderDash();toast('📨',`Relance envoyée — ${id}`);}
+function doRelance(id){const d=history.find(x=>x.id===id);if(d){d.status='envoye';saveData();}renderDash();toast('📨',`Relance envoyée — ${id}`);}
 
 // ══ CATALOGUE ══
 function renderCat() {
@@ -1157,10 +1158,10 @@ function saveCat(){
   const unit=document.getElementById('mc-unit').value;
   const cat=document.getElementById('mc-cat').value.trim()||'Général';
   if(!name) return;
-  catalogue.push({id:Date.now(),name,prix,unit,cat});
+  catalogue.push({id:Date.now(),name,prix,unit,cat}); saveData();
   closeModals(); renderCat(); toast('📦',`"${name}" ajouté`);
 }
-function delCat(id){catalogue=catalogue.filter(c=>c.id!==id);renderCat();toast('🗑','Supprimé');}
+function delCat(id){catalogue=catalogue.filter(c=>c.id!==id);saveData();renderCat();toast('🗑','Supprimé');}
 
 // ══ UTILS ══
 function closeModals(){document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('open'));}
@@ -1175,6 +1176,7 @@ function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
 // ══ INIT ══
 document.addEventListener('DOMContentLoaded', () => {
+  loadData();
   renderDash();
   renderCat();
   renderCatChips();
