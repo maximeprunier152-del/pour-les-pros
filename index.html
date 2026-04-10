@@ -1114,14 +1114,8 @@ function doLogout() {
 }
 
 function checkSession() {
-  try {
-    const s = localStorage.getItem(SESSION_KEY);
-    if (!s) return;
-    const sess = JSON.parse(s);
-    const users = getUsers();
-    const user = users[sess.email];
-    if (user) loginSuccess(user);
-  } catch(e) {}
+  // On demande toujours le mot de passe à chaque visite
+  try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
 }
 
 // ══ STATE ══
