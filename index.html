@@ -290,7 +290,13 @@ body {
 .btn-add-ligne:hover { border-color: var(--text); color: var(--text); background: var(--bg2); }
 
 /* ── CATALOGUE CHIPS ── */
-.cat-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.cat-chips {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;
+  max-height: 96px; overflow-y: auto; padding-right: 4px;
+}
+.cat-chips::-webkit-scrollbar { width: 4px; }
+.cat-chips::-webkit-scrollbar-track { background: transparent; }
+.cat-chips::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
 .cat-chip {
   padding: 5px 11px; border: 1px solid var(--border);
   border-radius: 20px; font-size: 12px; color: var(--text2);
@@ -1498,7 +1504,7 @@ function addL(){
 function renderCatChips() {
   const chips = document.getElementById('cat-chips');
   if (!chips) return;
-  chips.innerHTML = catalogue.slice(0,8).map((c,i)=>
+  chips.innerHTML = catalogue.map((c,i)=>
     `<button class="cat-chip" onclick="addFromCat(${i})">${c.name} — ${c.prix}€</button>`
   ).join('');
 }
