@@ -6,6 +6,7 @@
 <title>DevisIA</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --bg: #ffffff;
@@ -1221,19 +1222,14 @@ body {
 
 <script>
 
-// ══ AUTH ══
-const USERS_KEY = 'devisIA_users';
-const SESSION_KEY = 'devisIA_session';
+// ══ SUPABASE ══
+const SUPABASE_URL = 'https://jnequkfgukmyhcpnnsfb.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpuZXF1a2ZndWtteWhjcG5uc2ZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjQ5MDcsImV4cCI6MjA5MTUwMDkwN30.JPEzEldprbV1tG49OWgVWTx_g4A2lnsUFDt423G69Us';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 let currentUser = null;
 
-function getUsers() {
-  try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch(e) { return {}; }
-}
-function saveUsers(u) {
-  try { localStorage.setItem(USERS_KEY, JSON.stringify(u)); } catch(e) {}
-}
 function hashPwd(pwd) {
-  // Simple hash pour demo (en prod utiliser bcrypt côté serveur)
   let h = 0;
   for (let i = 0; i < pwd.length; i++) h = (Math.imul(31, h) + pwd.charCodeAt(i)) | 0;
   return h.toString(36) + pwd.length;
@@ -1252,18 +1248,26 @@ function showAuthError(msg) {
   el.textContent = msg; el.classList.add('show');
 }
 
-function doLogin() {
+async function doLogin() {
   const email = document.getElementById('li-email').value.trim().toLowerCase();
   const pwd = document.getElementById('li-pwd').value;
   if (!email || !pwd) { showAuthError('Veuillez remplir tous les champs.'); return; }
-  const users = getUsers();
-  const user = users[email];
-  if (!user) { showAuthError('Aucun compte trouvé avec cet email.'); return; }
-  if (user.pwd !== hashPwd(pwd)) { showAuthError('Mot de passe incorrect.'); return; }
-  loginSuccess(user);
+
+  const btn = document.querySelector('#formLogin .auth-btn');
+  btn.textContent = 'Connexion…'; btn.disabled = true;
+
+  try {
+    const { data, error } = await sb.from('users').select('*').eq('email', email).single();
+    if (error || !data) { showAuthError('Aucun compte trouvé avec cet email.'); btn.textContent = 'Se connecter →'; btn.disabled = false; return; }
+    if (data.password_hash !== hashPwd(pwd)) { showAuthError('Mot de passe incorrect.'); btn.textContent = 'Se connecter →'; btn.disabled = false; return; }
+    loginSuccess(data);
+  } catch(e) {
+    showAuthError('Erreur de connexion. Réessayez.');
+    btn.textContent = 'Se connecter →'; btn.disabled = false;
+  }
 }
 
-function doRegister() {
+async function doRegister() {
   const company = document.getElementById('re-company').value.trim();
   const name = document.getElementById('re-name').value.trim();
   const email = document.getElementById('re-email').value.trim().toLowerCase();
@@ -1273,19 +1277,38 @@ function doRegister() {
   if (!email.includes('@')) { showAuthError('Email invalide.'); return; }
   if (pwd.length < 6) { showAuthError('Le mot de passe doit faire au moins 6 caractères.'); return; }
   if (pwd !== pwd2) { showAuthError('Les mots de passe ne correspondent pas.'); return; }
-  const users = getUsers();
-  if (users[email]) { showAuthError('Un compte existe déjà avec cet email.'); return; }
-  const user = { name, company, email, pwd: hashPwd(pwd), createdAt: new Date().toISOString() };
-  users[email] = user;
-  saveUsers(users);
-  loginSuccess(user);
+
+  const btn = document.querySelector('#formRegister .auth-btn');
+  btn.textContent = 'Création…'; btn.disabled = true;
+
+  try {
+    // Vérifier si email existe déjà
+    const { data: existing } = await sb.from('users').select('email').eq('email', email).single();
+    if (existing) { showAuthError('Un compte existe déjà avec cet email.'); btn.textContent = 'Créer mon compte →'; btn.disabled = false; return; }
+
+    // Créer le compte
+    const { data, error } = await sb.from('users').insert([{
+      email, password_hash: hashPwd(pwd), name, company
+    }]).select().single();
+
+    if (error) throw error;
+
+    // Insérer le catalogue par défaut
+    const catDefaut = DEFAULT_CATALOGUE.map(c => ({
+      user_email: email, name: c.name, prix: c.prix, unit: c.unit, cat: c.cat
+    }));
+    await sb.from('catalogue').insert(catDefaut);
+
+    loginSuccess(data);
+  } catch(e) {
+    showAuthError('Erreur lors de la création. Réessayez.');
+    btn.textContent = 'Créer mon compte →'; btn.disabled = false;
+  }
 }
 
 function loginSuccess(user) {
   currentUser = user;
-  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ email: user.email, name: user.name })); } catch(e) {}
   document.getElementById('authScreen').classList.add('hidden');
-  // Pré-remplir le nom d'entreprise partout
   if (user.company) {
     ['t-ent','v-ent','f-ent'].forEach(id => {
       const el = document.getElementById(id);
@@ -1293,28 +1316,22 @@ function loginSuccess(user) {
     });
   }
   document.getElementById('userBar').classList.add('show');
-  document.getElementById('userBarName').textContent = user.name;
-  document.getElementById('userBarEmail').textContent = user.email;
-  // Charger les données de cet utilisateur
+  document.getElementById('userBarName').textContent = user.company || user.name;
+  document.getElementById('userBarEmail').textContent = user.name + ' · ' + user.email;
   loadUserData();
-  renderDash(); renderCat(); renderCatChips();
-  toast('👋', `Bonjour ${user.name.split(' ')[0]} !`);
 }
 
 function doLogout() {
   currentUser = null;
-  try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
   document.getElementById('authScreen').classList.remove('hidden');
   document.getElementById('userBar').classList.remove('show');
-  // Réinitialiser
   catalogue = []; history = [];
   renderDash(); renderCat();
   switchAuth('login');
 }
 
 function checkSession() {
-  // On demande toujours le mot de passe à chaque visite
-  try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
+  // Toujours demander le mot de passe à chaque visite
 }
 
 // ══ STATE ══
@@ -1323,20 +1340,9 @@ let devis = null;
 let recording = false;
 let recognition = null;
 
-// ══ PERSISTANCE localStorage ══
-function userKey(k) {
-  return currentUser ? 'devisIA_' + currentUser.email + '_' + k : null;
-}
-function saveData() {
-  if (!currentUser) return;
-  try {
-    localStorage.setItem(userKey('catalogue'), JSON.stringify(catalogue));
-    localStorage.setItem(userKey('history'), JSON.stringify(history));
-  } catch(e) {}
-}
-function loadData() {
-  // kept for compatibility
-}
+// ══ PERSISTANCE SUPABASE ══
+function saveData() { /* handled per-operation */ }
+function loadData() { /* handled per-operation */ }
 const DEFAULT_CATALOGUE = [
   {id:1, name:"Main d'œuvre", prix:55, unit:"heure", cat:"Main d'œuvre", default:true},
   {id:2, name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement", default:true},
@@ -1349,17 +1355,23 @@ const DEFAULT_CATALOGUE = [
   {id:9, name:"Maçonnerie", prix:65, unit:"heure", cat:"Maçonnerie", default:true},
 ];
 
-function loadUserData() {
+async function loadUserData() {
   if (!currentUser) return;
   try {
-    const savedCat = localStorage.getItem(userKey('catalogue'));
-    const savedHist = localStorage.getItem(userKey('history'));
-    // Si c'est la première connexion → on charge le catalogue par défaut
-    catalogue = savedCat ? JSON.parse(savedCat) : [...DEFAULT_CATALOGUE];
-    history = savedHist ? JSON.parse(savedHist) : [];
-    // Si le catalogue est vide → on remet les défauts
-    if (!catalogue.length) catalogue = [...DEFAULT_CATALOGUE];
-  } catch(e) { catalogue = [...DEFAULT_CATALOGUE]; history = []; }
+    // Charger catalogue depuis Supabase
+    const { data: catData } = await sb.from('catalogue').select('*').eq('user_email', currentUser.email);
+    catalogue = catData || [];
+
+    // Charger devis depuis Supabase
+    const { data: devisData } = await sb.from('devis').select('*').eq('user_email', currentUser.email).order('created_at', { ascending: false });
+    history = (devisData || []).map(d => ({
+      id: d.num, client: d.client, desc: d.description,
+      ttc: d.ttc, ht: d.ht, date: d.date_devis,
+      status: d.status, email: d.email_client
+    }));
+  } catch(e) { catalogue = []; history = []; }
+  renderDash(); renderCat(); renderCatChips();
+  toast('👋', `Bonjour ${currentUser.name.split(' ')[0]} !`);
 }
 
 let catalogue = [];
@@ -1497,7 +1509,14 @@ async function generer() {
 
   renderDoc(devis);
   btn.disabled=false; btn.innerHTML='<span>↻</span> Regénérer';
-  history.unshift({id:num,client:data.cli||'Client',desc:devis.objet.slice(0,40),ttc,date:now.toLocaleDateString('fr-FR'),status:'attente',email:data.email}); saveData();
+  const newDevis = {id:num,client:data.cli||'Client',desc:devis.objet.slice(0,40),ttc,date:now.toLocaleDateString('fr-FR'),status:'attente',email:data.email};
+  history.unshift(newDevis);
+  // Sauvegarder dans Supabase
+  if(currentUser) sb.from('devis').insert([{
+    user_email: currentUser.email, num, client: data.cli||'Client',
+    description: devis.objet.slice(0,40), ttc, ht: devis.ht,
+    email_client: data.email, date_devis: now.toLocaleDateString('fr-FR'), status: 'attente'
+  }]);
 }
 
 function getData() {
@@ -1652,7 +1671,8 @@ function openEmailModal() {
   document.getElementById('m-email').classList.add('open');
 }
 function doSendEmail() {
-  const h=history.find(x=>x.id===devis?.num); if(h) h.status='envoye'; saveData();
+  const h=history.find(x=>x.id===devis?.num);
+  if(h){ h.status='envoye'; if(currentUser) sb.from('devis').update({status:'envoye'}).eq('num',devis.num).eq('user_email',currentUser.email); }
   closeModals(); toast('✉️','Devis envoyé par email !');
   setTimeout(()=>toast('🔔','Relance programmée dans 3 jours'),2200);
 }
@@ -1669,7 +1689,8 @@ function doSign() {
   devis.signed=true;
   const sc=document.getElementById('sign-cli');
   if(sc){sc.innerHTML=`<div class="sign-name">${devis.cli}</div><div class="sign-date">Signé le ${devis.date}</div>`;sc.classList.add('show');}
-  const h=history.find(x=>x.id===devis.num); if(h) h.status='signe'; saveData();
+  const h=history.find(x=>x.id===devis.num);
+  if(h){ h.status='signe'; if(currentUser) sb.from('devis').update({status:'signe'}).eq('num',devis.num).eq('user_email',currentUser.email); }
   toast('✍️',`Signé par ${devis.cli}`);
 }
 
@@ -1703,7 +1724,11 @@ function renderDash() {
     <td><span class="badge ${SC[d.status]}">${SL[d.status]}</span></td>
   </tr>`).join('');
 }
-function doRelance(id){const d=history.find(x=>x.id===id);if(d){d.status='envoye';saveData();}renderDash();toast('📨',`Relance envoyée — ${id}`);}
+function doRelance(id){
+  const d=history.find(x=>x.id===id);
+  if(d){ d.status='envoye'; if(currentUser) sb.from('devis').update({status:'envoye'}).eq('num',id).eq('user_email',currentUser.email); }
+  renderDash(); toast('📨',`Relance envoyée — ${id}`);
+}
 
 // ══ CATALOGUE ══
 const CAT_ICONS = {
@@ -1742,10 +1767,16 @@ function saveCat(){
   const unit=document.getElementById('mc-unit').value;
   const cat=document.getElementById('mc-cat').value.trim()||'Général';
   if(!name) return;
-  catalogue.push({id:Date.now(),name,prix,unit,cat}); saveData();
+  const newItem = {id:Date.now(),name,prix,unit,cat};
+  catalogue.push(newItem);
+  if(currentUser) sb.from('catalogue').insert([{user_email:currentUser.email,name,prix,unit,cat}]);
   closeModals(); renderCat(); toast('📦',`"${name}" ajouté`);
 }
-function delCat(id){catalogue=catalogue.filter(c=>c.id!==id);saveData();renderCat();toast('🗑','Supprimé');}
+function delCat(id){
+  catalogue=catalogue.filter(c=>c.id!==id);
+  if(currentUser) sb.from('catalogue').delete().eq('id',id).eq('user_email',currentUser.email);
+  renderCat(); toast('🗑','Supprimé');
+}
 
 
 // ══ IMPORT ANCIEN DEVIS ══
@@ -1909,8 +1940,13 @@ function confirmImport() {
   if (!client) { toast('⚠️', 'Veuillez renseigner le nom du client'); return; }
   if (!ttc && !ht) { toast('⚠️', 'Veuillez renseigner le montant'); return; }
 
-  history.push({ id: num, client, desc, ttc: ttc || Math.round(ht*1.1*100)/100, ht, date, status, email, imported: true });
-  saveData();
+  const importedDevis = { id: num, client, desc, ttc: ttc || Math.round(ht*1.1*100)/100, ht, date, status, email, imported: true };
+  history.push(importedDevis);
+  if(currentUser) sb.from('devis').insert([{
+    user_email: currentUser.email, num, client,
+    description: desc, ttc: importedDevis.ttc, ht,
+    email_client: email, date_devis: date, status
+  }]);
   closeModals();
   renderDash();
   toast('✅', `Devis de ${client} ajouté !${status==='attente'?' Une relance peut être envoyée.':''}`);
