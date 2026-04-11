@@ -1062,7 +1062,11 @@ body {
       <div class="import-result-title">✅ Informations extraites — vérifiez et corrigez si besoin</div>
       <div class="import-field-row">
         <div class="import-field"><label>Client</label><input type="text" id="imp-client" placeholder="Nom du client"></div>
-        <div class="import-field"><label>Montant TTC (€)</label><input type="number" id="imp-ttc" placeholder="0.00"></div>
+        <div class="import-field"><label>Email du client</label><input type="email" id="imp-email" placeholder="client@email.fr"></div>
+      </div>
+      <div class="import-field-row">
+        <div class="import-field"><label>Montant HT (€)</label><input type="number" id="imp-ht" placeholder="0.00" oninput="calcImportTTC()"></div>
+        <div class="import-field"><label>Montant TTC (€)</label><input type="number" id="imp-ttc" placeholder="0.00" oninput="calcImportHT()"></div>
       </div>
       <div class="import-field-row">
         <div class="import-field"><label>Objet / Description</label><input type="text" id="imp-desc" placeholder="Objet du devis"></div>
@@ -1072,9 +1076,9 @@ body {
         <div class="import-field"><label>N° de devis</label><input type="text" id="imp-num" placeholder="DEV-2024-001"></div>
         <div class="import-field"><label>Statut</label>
           <select id="imp-status">
-            <option value="signe">Signé</option>
+            <option value="signe">Signé ✅</option>
+            <option value="attente">Non payé — À relancer 🔔</option>
             <option value="envoye">Envoyé</option>
-            <option value="attente">En attente</option>
             <option value="ouvert">Ouvert</option>
           </select>
         </div>
@@ -1702,14 +1706,17 @@ async function extractWithClaude(file) {
   const prompt = `Analyse ce document (devis, facture ou bon de commande) et extrait les informations suivantes en JSON uniquement, sans markdown.
 
 Format exact:
-{"client":"nom du client","ttc":montant_total_ttc_nombre,"desc":"objet ou description courte","date":"JJ/MM/AAAA","num":"numero du devis si visible sinon vide","status":"signe"}
+{"client":"nom du client","email":"email du client si visible sinon vide","ht":montant_ht_nombre,"ttc":montant_ttc_nombre,"desc":"objet ou description courte","date":"JJ/MM/AAAA","num":"numero du devis si visible sinon vide","status":"signe"}
 
 Règles:
-- ttc: montant total TTC en nombre (ex: 850.50), si pas de TTC utilise le total HT
+- ht: montant total HT en nombre (ex: 773.00), 0 si absent
+- ttc: montant total TTC en nombre (ex: 850.30), 0 si absent
+- Si seulement un total est visible, calcule l'autre (TVA 10%)
+- email: adresse email du client si visible dans le document
 - date: date du devis au format JJ/MM/AAAA
 - desc: description courte de la prestation (max 50 caractères)
 - status: toujours "signe" pour un ancien devis
-- Si une info est absente, mets une chaîne vide ""`;
+- Si une info est absente, mets une chaîne vide "" ou 0 pour les nombres`;
 
   const msgContent = isImage
     ? [
@@ -1747,28 +1754,44 @@ function fileToBase64(file) {
 
 function fillImportFields(data) {
   document.getElementById('imp-client').value = data.client || '';
-  document.getElementById('imp-ttc').value = data.ttc || '';
+  document.getElementById('imp-email').value = data.email || '';
+  const ttc = parseFloat(data.ttc) || 0;
+  const ht = parseFloat(data.ht) || (ttc ? Math.round(ttc / 1.1 * 100) / 100 : '');
+  document.getElementById('imp-ttc').value = ttc || '';
+  document.getElementById('imp-ht').value = ht || '';
   document.getElementById('imp-desc').value = data.desc || '';
   document.getElementById('imp-date').value = data.date || new Date().toLocaleDateString('fr-FR');
   document.getElementById('imp-num').value = data.num || ('DEV-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*900)+100));
   document.getElementById('imp-status').value = data.status || 'signe';
 }
 
+function calcImportTTC() {
+  const ht = parseFloat(document.getElementById('imp-ht').value) || 0;
+  if (ht) document.getElementById('imp-ttc').value = Math.round(ht * 1.1 * 100) / 100;
+}
+function calcImportHT() {
+  const ttc = parseFloat(document.getElementById('imp-ttc').value) || 0;
+  if (ttc) document.getElementById('imp-ht').value = Math.round(ttc / 1.1 * 100) / 100;
+}
+
 function confirmImport() {
   const client = document.getElementById('imp-client').value.trim();
+  const email = document.getElementById('imp-email').value.trim();
   const ttc = parseFloat(document.getElementById('imp-ttc').value) || 0;
+  const ht = parseFloat(document.getElementById('imp-ht').value) || 0;
   const desc = document.getElementById('imp-desc').value.trim();
   const date = document.getElementById('imp-date').value.trim();
   const num = document.getElementById('imp-num').value.trim() || ('DEV-' + Date.now());
   const status = document.getElementById('imp-status').value;
 
   if (!client) { toast('⚠️', 'Veuillez renseigner le nom du client'); return; }
+  if (!ttc && !ht) { toast('⚠️', 'Veuillez renseigner le montant'); return; }
 
-  history.push({ id: num, client, desc, ttc, date, status, email: '', imported: true });
+  history.push({ id: num, client, desc, ttc: ttc || Math.round(ht*1.1*100)/100, ht, date, status, email, imported: true });
   saveData();
   closeModals();
   renderDash();
-  toast('✅', `Devis de ${client} ajouté au tableau de bord !`);
+  toast('✅', `Devis de ${client} ajouté !${status==='attente'?' Une relance peut être envoyée.':''}`);
 }
 
 // ══ UTILS ══
