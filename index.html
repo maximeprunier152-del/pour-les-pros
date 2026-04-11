@@ -1413,8 +1413,11 @@ async function loadUserData() {
   document.querySelectorAll('.bottom-nav-item').forEach(x=>x.classList.remove('active'));
   const bn = document.getElementById('bn-devis');
   if(bn) bn.classList.add('active');
-  // Attendre que le DOM soit prêt avant de rendre les chips
-  setTimeout(() => { renderCatChips(); }, 100);
+  // Appeler renderCatChips plusieurs fois pour s'assurer que ça s'affiche
+  renderCatChips();
+  setTimeout(() => renderCatChips(), 200);
+  setTimeout(() => renderCatChips(), 500);
+  setTimeout(() => renderCatChips(), 1000);
   toast('👋', `Bonjour ${currentUser.name.split(' ')[0]} !`);
 }
 
@@ -1522,15 +1525,25 @@ function addL(){
 function renderCatChips() {
   const chips = document.getElementById('cat-chips');
   if (!chips) return;
-  if (!catalogue.length) { chips.innerHTML = ''; return; }
+  if (!catalogue.length) { chips.innerHTML = '<span style="font-size:12px;color:var(--text3)">Chargement...</span>'; return; }
   chips.innerHTML = catalogue.map((c,i)=>
     `<button class="cat-chip" onclick="addFromCat(${i})">${c.name} — ${c.prix}€</button>`
   ).join('');
-  // Forcer le re-render si le parent est caché puis réaffiché
-  chips.style.display = 'none';
-  chips.offsetHeight; // force reflow
-  chips.style.display = '';
 }
+
+// Observer : relance renderCatChips quand imode-form devient visible
+(function() {
+  const obs = new MutationObserver(() => {
+    const form = document.getElementById('imode-form');
+    if (form && form.classList.contains('active') && catalogue.length) {
+      renderCatChips();
+    }
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('imode-form');
+    if (form) obs.observe(form, { attributes: true, attributeFilter: ['class'] });
+  });
+})();
 function addFromCat(idx) {
   const item=catalogue[idx]; if(!item) return;
   const wrap=document.getElementById('lignes'),d=document.createElement('div');
