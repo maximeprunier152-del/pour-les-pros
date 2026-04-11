@@ -1405,7 +1405,15 @@ async function loadUserData() {
 
   renderDash();
   renderCat();
-  renderCatChips();
+  renderCatChips(); // Chips pour le formulaire
+  // S'assurer que la page devis est active par défaut
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-devis').classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  document.getElementById('ni-devis').classList.add('active');
+  document.querySelectorAll('.bottom-nav-item').forEach(x=>x.classList.remove('active'));
+  const bn = document.getElementById('bn-devis');
+  if(bn) bn.classList.add('active');
   toast('👋', `Bonjour ${currentUser.name.split(' ')[0]} !`);
 }
 
@@ -1428,11 +1436,13 @@ async function goPage(p) {
   const bn = document.getElementById('bn-'+p);
   if(bn) bn.classList.add('active');
   // Recharger depuis Supabase à chaque navigation
-  if(p==='cat' && currentUser) {
-    const { data } = await sb.from('catalogue').select('*').eq('user_email',currentUser.email).order('id',{ascending:true});
-    if(data) catalogue = data;
-    renderCat(); renderCatChips();
+  if(currentUser) {
+    // Toujours recharger le catalogue depuis Supabase (pour les chips ET la page catalogue)
+    const { data: catData } = await sb.from('catalogue').select('*').eq('user_email',currentUser.email).order('id',{ascending:true});
+    if(catData) catalogue = catData;
   }
+  if(p==='cat') { renderCat(); renderCatChips(); }
+  if(p==='devis') { renderCatChips(); }
   if(p==='dash' && currentUser) {
     const { data } = await sb.from('devis').select('*').eq('user_email',currentUser.email).order('created_at',{ascending:false});
     if(data) history = data.map(d=>({id:d.num,client:d.client,desc:d.description,ttc:d.ttc,ht:d.ht,date:d.date_devis,status:d.status,email:d.email_client}));
@@ -1442,13 +1452,20 @@ async function goPage(p) {
 }
 
 // ══ TABS ══
-function switchTab(m, btn) {
+async function switchTab(m, btn) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
   document.querySelectorAll('.imode').forEach(x=>x.classList.remove('active'));
   document.getElementById('imode-'+m).classList.add('active');
   mode = m;
-  if(m==='form') renderCatChips();
+  if(m==='form') {
+    // Recharger catalogue depuis Supabase avant d'afficher les chips
+    if(currentUser) {
+      const { data } = await sb.from('catalogue').select('*').eq('user_email',currentUser.email).order('id',{ascending:true});
+      if(data) catalogue = data;
+    }
+    renderCatChips();
+  }
 }
 
 // ══ VOICE ══
