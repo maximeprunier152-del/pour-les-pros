@@ -509,15 +509,94 @@ body {
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .section-title { font-family: 'Manrope', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: -.3px; }
 
+/* ── BOTTOM NAV MOBILE ── */
+.bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #fff; border-top: 1px solid var(--border);
+  z-index: 20; padding: 0;
+  box-shadow: 0 -4px 16px rgba(0,0,0,.06);
+}
+.bottom-nav-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 10px 4px 14px;
+  font-size: 10px; font-weight: 600; color: var(--text3);
+  cursor: pointer; border: none; background: none;
+  font-family: 'Inter', sans-serif; gap: 3px;
+  transition: color .15s;
+}
+.bni { font-size: 20px; line-height: 1; }
+.bni-dot { width: 4px; height: 4px; background: transparent; border-radius: 50%; margin: 1px auto 0; transition: background .15s; }
+.bottom-nav-item.active { color: var(--text); }
+.bottom-nav-item.active .bni-dot { background: var(--text); }
+
 @media(max-width: 768px) {
   .sidebar { display: none; }
   .main { margin-left: 0; }
-  .content { padding: 20px; }
-  .stats-row { grid-template-columns: 1fr 1fr; }
-  .cat-grid { grid-template-columns: 1fr 1fr; }
-  .doc-body { padding: 20px; }
-  .doc-header, .doc-parties, .doc-sign-area { flex-direction: column; gap: 16px; }
-  .row2 { grid-template-columns: 1fr; }
+  .bottom-nav { display: flex; }
+  .main { padding-bottom: 72px; }
+
+  .topbar { padding: 14px 16px; flex-wrap: wrap; gap: 8px; }
+  .topbar-title { font-size: 15px; }
+  .topbar-sub { font-size: 11px; }
+  .btn-primary { font-size: 12px; padding: 8px 12px; }
+
+  .content { padding: 14px 16px; max-width: 100%; }
+  .card { padding: 16px; border-radius: 10px; margin-bottom: 12px; }
+  .card-title { font-size: 10px; }
+
+  .tabs { width: 100%; }
+  .tab { flex: 1; padding: 8px 6px; font-size: 12px; }
+
+  .row2 { grid-template-columns: 1fr; gap: 0; }
+  .field { margin-bottom: 12px; }
+  .field input, .field textarea, .field select { font-size: 16px; }
+  .field textarea { min-height: 90px; }
+
+  .stats-row { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .stat-card { padding: 14px; border-radius: 10px; }
+  .stat-card-n { font-size: 24px; }
+  .stat-card-l { font-size: 11px; }
+
+  .devis-table thead { display: none; }
+  .devis-table, .devis-table tbody, .devis-table tr { display: block; width: 100%; }
+  .devis-table tr {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 8px; background: var(--bg);
+    position: relative;
+  }
+  .devis-table td { display: block; border: none; padding: 2px 0; font-size: 13px; }
+  .devis-table td:nth-child(1) { font-size: 11px; color: var(--text3); }
+  .devis-table td:nth-child(2) { font-weight: 600; font-size: 14px; }
+  .devis-table td:nth-child(3) { font-size: 12px; color: var(--text2); }
+  .devis-table td:nth-child(4) { position: absolute; top: 12px; right: 14px; font-weight: 700; font-size: 15px; }
+  .devis-table td:nth-child(5) { display: none; }
+  .devis-table td:nth-child(6) { margin-top: 4px; }
+
+  .cat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cat-card { padding: 14px; }
+  .cat-card-price { font-size: 18px; }
+
+  .ligne-head { display: none; }
+  .ligne-row { grid-template-columns: 1fr auto auto auto 24px; padding: 10px 10px; }
+  .ligne-row input { font-size: 14px; }
+  .li-qty, .li-pu { width: 52px; }
+
+  .doc-wrap { border-radius: 10px; }
+  .doc-body { padding: 18px 14px; }
+  .doc-header, .doc-parties, .doc-sign-area { flex-direction: column; gap: 12px; }
+  .doc-toolbar { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+  .doc-actions { flex-wrap: wrap; gap: 6px; }
+  .btn-sm { font-size: 11px; padding: 6px 10px; }
+  .tot-box { width: 100%; }
+
+  .overlay { align-items: flex-end; }
+  .modal { border-radius: 16px 16px 0 0; padding: 24px 20px 32px; width: 100% !important; max-width: 100% !important; }
+
+  .import-field-row { grid-template-columns: 1fr; gap: 0; }
+  .relance-row { flex-direction: column; gap: 10px; align-items: flex-start; }
+  .section-title { font-size: 15px; }
 }
 
 /* ══ AUTH SCREEN ══ */
@@ -1275,8 +1354,14 @@ function goPage(p) {
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.getElementById('ni-'+p).classList.add('active');
+  // Update bottom nav
+  document.querySelectorAll('.bottom-nav-item').forEach(x=>x.classList.remove('active'));
+  const bn = document.getElementById('bn-'+p);
+  if(bn) bn.classList.add('active');
   if(p==='dash') renderDash();
   if(p==='cat') renderCat();
+  // Scroll top on mobile
+  window.scrollTo(0, 0);
 }
 
 // ══ TABS ══
@@ -1810,5 +1895,24 @@ document.addEventListener('DOMContentLoaded', () => {
   checkSession();
 });
 </script>
+
+<!-- ── BOTTOM NAV MOBILE ── -->
+<nav class="bottom-nav" id="bottomNav">
+  <button class="bottom-nav-item active" id="bn-devis" onclick="goPage('devis')">
+    <span class="bni">✏️</span>
+    <span>Devis</span>
+    <div class="bni-dot"></div>
+  </button>
+  <button class="bottom-nav-item" id="bn-dash" onclick="goPage('dash')">
+    <span class="bni">📊</span>
+    <span>Dashboard</span>
+    <div class="bni-dot"></div>
+  </button>
+  <button class="bottom-nav-item" id="bn-cat" onclick="goPage('cat')">
+    <span class="bni">📦</span>
+    <span>Catalogue</span>
+    <div class="bni-dot"></div>
+  </button>
+</nav>
 </body>
 </html>
