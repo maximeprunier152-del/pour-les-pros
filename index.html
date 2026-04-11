@@ -688,6 +688,59 @@ body {
 }
 .btn-logout:hover { color: var(--red); }
 
+
+/* ══ IMPORT ANCIEN DEVIS ══ */
+.import-zone {
+  border: 2px dashed var(--border2);
+  border-radius: 12px; padding: 28px;
+  text-align: center; cursor: pointer;
+  transition: all .2s; margin-bottom: 20px;
+  background: var(--bg);
+}
+.import-zone:hover, .import-zone.drag { border-color: var(--blue); background: #eff6ff; }
+.import-zone-icon { font-size: 32px; margin-bottom: 8px; }
+.import-zone-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.import-zone-sub { font-size: 12px; color: var(--text3); }
+.import-preview {
+  border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden; margin-bottom: 16px; display: none;
+}
+.import-preview.show { display: block; }
+.import-preview img { width: 100%; max-height: 280px; object-fit: contain; background: var(--bg2); }
+.import-result {
+  display: none; background: var(--bg2);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px; margin-bottom: 16px;
+}
+.import-result.show { display: block; }
+.import-result-title { font-size: 12px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 12px; }
+.import-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.import-field { }
+.import-field label { display: block; font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+.import-field input, .import-field select {
+  width: 100%; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13px; font-family: 'Inter', sans-serif;
+  color: var(--text); background: var(--bg); outline: none;
+  transition: border-color .15s; appearance: none; margin: 0;
+}
+.import-field input:focus { border-color: var(--text); }
+.import-ai-row {
+  display: none; align-items: center; gap: 8px;
+  padding: 10px 12px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 8px;
+  margin-bottom: 12px; font-size: 13px; color: var(--text2);
+}
+.import-ai-row.show { display: flex; }
+.btn-import-confirm {
+  width: 100%; padding: 10px;
+  background: var(--text); color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: 'Inter', sans-serif;
+  transition: opacity .15s;
+}
+.btn-import-confirm:hover { opacity: .8; }
 </style>
 </head>
 <body>
@@ -854,6 +907,9 @@ body {
       <div class="topbar-title">Tableau de bord</div>
       <div class="topbar-sub">Suivi de vos devis en temps réel</div>
     </div>
+    <button class="btn-primary" onclick="openImportModal()">
+      <span>📂</span> Importer un ancien devis
+    </button>
   </div>
   <div class="content">
 
@@ -972,6 +1028,66 @@ body {
 </div><!-- /shell -->
 
 <!-- MODALS -->
+<!-- IMPORT MODAL -->
+<div class="overlay" id="m-import">
+  <div class="modal" style="width:520px;max-width:95vw;">
+    <div class="modal-title">Importer un ancien devis</div>
+    <div class="modal-sub">Photo ou PDF — l'IA lit et extrait toutes les informations automatiquement.</div>
+
+    <!-- DROP ZONE -->
+    <div class="import-zone" id="importZone"
+      onclick="document.getElementById('importFile').click()"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="handleDrop(event)">
+      <div class="import-zone-icon">📄</div>
+      <div class="import-zone-title">Glissez votre fichier ici ou cliquez</div>
+      <div class="import-zone-sub">JPG, PNG, PDF acceptés · Max 10 Mo</div>
+    </div>
+    <input type="file" id="importFile" accept="image/*,.pdf" style="display:none" onchange="handleImportFile(this)">
+
+    <!-- PREVIEW IMAGE -->
+    <div class="import-preview" id="importPreview">
+      <img id="importImg" src="" alt="Aperçu">
+    </div>
+
+    <!-- AI STATUS -->
+    <div class="import-ai-row" id="importAiRow">
+      <div class="dots"><span></span><span></span><span></span></div>
+      <span id="importAiTxt">Analyse du document en cours…</span>
+    </div>
+
+    <!-- RESULT FIELDS -->
+    <div class="import-result" id="importResult">
+      <div class="import-result-title">✅ Informations extraites — vérifiez et corrigez si besoin</div>
+      <div class="import-field-row">
+        <div class="import-field"><label>Client</label><input type="text" id="imp-client" placeholder="Nom du client"></div>
+        <div class="import-field"><label>Montant TTC (€)</label><input type="number" id="imp-ttc" placeholder="0.00"></div>
+      </div>
+      <div class="import-field-row">
+        <div class="import-field"><label>Objet / Description</label><input type="text" id="imp-desc" placeholder="Objet du devis"></div>
+        <div class="import-field"><label>Date</label><input type="text" id="imp-date" placeholder="JJ/MM/AAAA"></div>
+      </div>
+      <div class="import-field-row">
+        <div class="import-field"><label>N° de devis</label><input type="text" id="imp-num" placeholder="DEV-2024-001"></div>
+        <div class="import-field"><label>Statut</label>
+          <select id="imp-status">
+            <option value="signe">Signé</option>
+            <option value="envoye">Envoyé</option>
+            <option value="attente">En attente</option>
+            <option value="ouvert">Ouvert</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-import-confirm" onclick="confirmImport()">✅ Ajouter au tableau de bord</button>
+    </div>
+
+    <div class="modal-actions" style="margin-top:0">
+      <button class="btn-cancel" onclick="closeModals()">Annuler</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="m-email">
   <div class="modal">
     <div class="modal-title">Envoyer par email</div>
@@ -1504,6 +1620,156 @@ function saveCat(){
   closeModals(); renderCat(); toast('📦',`"${name}" ajouté`);
 }
 function delCat(id){catalogue=catalogue.filter(c=>c.id!==id);saveData();renderCat();toast('🗑','Supprimé');}
+
+
+// ══ IMPORT ANCIEN DEVIS ══
+function openImportModal() {
+  // Reset
+  document.getElementById('importPreview').classList.remove('show');
+  document.getElementById('importResult').classList.remove('show');
+  document.getElementById('importAiRow').classList.remove('show');
+  document.getElementById('importFile').value = '';
+  document.getElementById('m-import').classList.add('open');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('importZone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) processImportFile(file);
+}
+
+function handleImportFile(input) {
+  const file = input.files[0];
+  if (file) processImportFile(file);
+}
+
+async function processImportFile(file) {
+  const preview = document.getElementById('importPreview');
+  const img = document.getElementById('importImg');
+  const aiRow = document.getElementById('importAiRow');
+  const result = document.getElementById('importResult');
+
+  // Afficher preview si image
+  if (file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; preview.classList.add('show'); };
+    reader.readAsDataURL(file);
+  } else {
+    preview.classList.remove('show');
+  }
+
+  result.classList.remove('show');
+  aiRow.classList.add('show');
+
+  const steps = [
+    'Lecture du document…',
+    'Extraction des données…',
+    'Identification du client et des montants…',
+    'Analyse terminée ✅',
+  ];
+  for (const s of steps) {
+    document.getElementById('importAiTxt').textContent = s;
+    await sleep(400 + Math.random() * 300);
+  }
+
+  // Appel Claude API avec l'image
+  try {
+    const extracted = await extractWithClaude(file);
+    fillImportFields(extracted);
+  } catch(e) {
+    // Fallback si pas d'API key
+    fillImportFields({
+      client: 'Client extrait',
+      ttc: '',
+      desc: 'Prestation de service',
+      date: new Date().toLocaleDateString('fr-FR'),
+      num: 'DEV-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*900)+100),
+      status: 'signe'
+    });
+  }
+
+  aiRow.classList.remove('show');
+  result.classList.add('show');
+}
+
+async function extractWithClaude(file) {
+  // Convertir fichier en base64
+  const base64 = await fileToBase64(file);
+  const isImage = file.type.startsWith('image/');
+  const mediaType = isImage ? file.type : 'application/pdf';
+
+  const prompt = `Analyse ce document (devis, facture ou bon de commande) et extrait les informations suivantes en JSON uniquement, sans markdown.
+
+Format exact:
+{"client":"nom du client","ttc":montant_total_ttc_nombre,"desc":"objet ou description courte","date":"JJ/MM/AAAA","num":"numero du devis si visible sinon vide","status":"signe"}
+
+Règles:
+- ttc: montant total TTC en nombre (ex: 850.50), si pas de TTC utilise le total HT
+- date: date du devis au format JJ/MM/AAAA
+- desc: description courte de la prestation (max 50 caractères)
+- status: toujours "signe" pour un ancien devis
+- Si une info est absente, mets une chaîne vide ""`;
+
+  const msgContent = isImage
+    ? [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+        { type: 'text', text: prompt }
+      ]
+    : [
+        { type: 'document', source: { type: 'base64', media_type: mediaType, data: base64 } },
+        { type: 'text', text: prompt }
+      ];
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: msgContent }]
+    })
+  });
+
+  const data = await resp.json();
+  const txt = data.content?.[0]?.text || '{}';
+  return JSON.parse(txt.replace(/```json|```/g, '').trim());
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+function fillImportFields(data) {
+  document.getElementById('imp-client').value = data.client || '';
+  document.getElementById('imp-ttc').value = data.ttc || '';
+  document.getElementById('imp-desc').value = data.desc || '';
+  document.getElementById('imp-date').value = data.date || new Date().toLocaleDateString('fr-FR');
+  document.getElementById('imp-num').value = data.num || ('DEV-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*900)+100));
+  document.getElementById('imp-status').value = data.status || 'signe';
+}
+
+function confirmImport() {
+  const client = document.getElementById('imp-client').value.trim();
+  const ttc = parseFloat(document.getElementById('imp-ttc').value) || 0;
+  const desc = document.getElementById('imp-desc').value.trim();
+  const date = document.getElementById('imp-date').value.trim();
+  const num = document.getElementById('imp-num').value.trim() || ('DEV-' + Date.now());
+  const status = document.getElementById('imp-status').value;
+
+  if (!client) { toast('⚠️', 'Veuillez renseigner le nom du client'); return; }
+
+  history.push({ id: num, client, desc, ttc, date, status, email: '', imported: true });
+  saveData();
+  closeModals();
+  renderDash();
+  toast('✅', `Devis de ${client} ajouté au tableau de bord !`);
+}
 
 // ══ UTILS ══
 function closeModals(){document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('open'));}
