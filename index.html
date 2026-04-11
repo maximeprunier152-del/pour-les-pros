@@ -1314,23 +1314,29 @@ async function doRegister() {
 
 async function loginSuccess(user) {
   currentUser = user;
-  document.getElementById('authScreen').classList.add('hidden');
+  const authScr = document.getElementById('authScreen');
+  if(authScr) authScr.classList.add('hidden');
   if (user.company) {
     ['t-ent','v-ent','f-ent'].forEach(id => {
       const el = document.getElementById(id);
       if (el && !el.value) el.value = user.company;
     });
   }
-  document.getElementById('userBar').classList.add('show');
-  document.getElementById('userBarName').textContent = user.company || user.name;
-  document.getElementById('userBarEmail').textContent = user.name + ' · ' + user.email;
+  const badge = document.getElementById('userBadge');
+  const uName = document.getElementById('userName');
+  const uEmail = document.getElementById('userEmail');
+  if(badge) badge.style.display = 'flex';
+  if(uName) uName.textContent = user.company || user.name;
+  if(uEmail) uEmail.textContent = user.email;
   await loadUserData();
 }
 
 function doLogout() {
   currentUser = null;
-  document.getElementById('authScreen').classList.remove('hidden');
-  document.getElementById('userBar').classList.remove('show');
+  const authScr2 = document.getElementById('authScreen');
+  if(authScr2) authScr2.classList.remove('hidden');
+  const badge = document.getElementById('userBadge');
+  if(badge) badge.style.display = 'none';
   catalogue = []; history = [];
   renderDash(); renderCat();
   switchAuth('login');
