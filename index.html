@@ -1374,6 +1374,11 @@ async function loadUserData() {
   toast('👋', `Bonjour ${currentUser.name.split(' ')[0]} !`);
 }
 
+// Force refresh chips after saving new cat item
+function refreshAll() {
+  renderCat(); renderCatChips(); if(document.getElementById('page-dash').classList.contains('active')) renderDash();
+}
+
 let catalogue = [];
 let history = [];
 
@@ -1454,12 +1459,14 @@ function addL(){
   wrap.appendChild(d);
 }
 function renderCatChips() {
-  document.getElementById('cat-chips').innerHTML = catalogue.slice(0,6).map(c=>
-    `<button class="cat-chip" onclick="addFromCat(${c.id})">${c.name} — ${c.prix}€</button>`
+  const chips = document.getElementById('cat-chips');
+  if (!chips) return;
+  chips.innerHTML = catalogue.slice(0,8).map((c,i)=>
+    `<button class="cat-chip" onclick="addFromCat(${i})">${c.name} — ${c.prix}€</button>`
   ).join('');
 }
-function addFromCat(id) {
-  const item=catalogue.find(c=>c.id===id); if(!item) return;
+function addFromCat(idx) {
+  const item=catalogue[idx]; if(!item) return;
   const wrap=document.getElementById('lignes'),d=document.createElement('div');
   d.className='ligne-row';
   d.innerHTML=`<input type="text" value="${item.name}">
@@ -1557,7 +1564,7 @@ function renderDoc(d) {
     <div class="doc-header">
       <div>
         <div class="doc-from-name">${d.ent}</div>
-        <div class="doc-from-info">123 rue de la République · 69000 Lyon<br>📞 06 12 34 56 78 · contact@${slug}.fr<br>SIRET : 123 456 789 00012</div>
+        <div class="doc-from-info">${currentUser?.city||'Lyon (69)'}<br>${currentUser?.phone?'📞 '+currentUser.phone+' · ':''} ${currentUser?.email||''}</div>
       </div>
       <div class="doc-num-area">
         <div class="doc-num-label">Devis</div>
@@ -1567,8 +1574,8 @@ function renderDoc(d) {
     </div>
     <div class="doc-divider"></div>
     <div class="doc-parties">
-      <div class="doc-party"><div class="doc-party-label">Prestataire</div><div class="doc-party-name">${d.ent}</div><div class="doc-party-info">Lyon (69)</div></div>
-      <div class="doc-party"><div class="doc-party-label">Client</div><div class="doc-party-name">${d.cli}</div><div class="doc-party-info">Lyon (69)</div></div>
+      <div class="doc-party"><div class="doc-party-label">Prestataire</div><div class="doc-party-name">${d.ent}</div><div class="doc-party-info">${currentUser?.email||''}</div></div>
+      <div class="doc-party"><div class="doc-party-label">Client</div><div class="doc-party-name">${d.cli}</div><div class="doc-party-info">${d.emailCli||''}</div></div>
     </div>
     <div class="doc-objet"><div class="doc-objet-label">Objet</div><div class="doc-objet-text">${d.objet}</div></div>
     <table class="doc-table">
@@ -1769,7 +1776,12 @@ function saveCat(){
   if(!name) return;
   const newItem = {id:Date.now(),name,prix,unit,cat};
   catalogue.push(newItem);
-  if(currentUser) sb.from('catalogue').insert([{user_email:currentUser.email,name,prix,unit,cat}]);
+  if(currentUser) {
+    sb.from('catalogue').insert([{user_email:currentUser.email,name,prix,unit,cat}]).then(()=>{
+      // Recharger le catalogue depuis Supabase pour avoir les vrais IDs
+      sb.from('catalogue').select('*').eq('user_email',currentUser.email).then(({data})=>{ if(data){catalogue=data; refreshAll();} });
+    });
+  }
   closeModals(); renderCat(); toast('📦',`"${name}" ajouté`);
 }
 function delCat(id){
@@ -1835,11 +1847,12 @@ async function processImportFile(file) {
     const extracted = await extractWithClaude(file);
     fillImportFields(extracted);
   } catch(e) {
-    // Fallback si pas d'API key
     fillImportFields({
-      client: 'Client extrait',
-      ttc: '',
-      desc: 'Prestation de service',
+      client: '',
+      email: '',
+      ht: 0,
+      ttc: 0,
+      desc: '',
       date: new Date().toLocaleDateString('fr-FR'),
       num: 'DEV-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*900)+100),
       status: 'signe'
@@ -1856,20 +1869,20 @@ async function extractWithClaude(file) {
   const isImage = file.type.startsWith('image/');
   const mediaType = isImage ? file.type : 'application/pdf';
 
-  const prompt = `Analyse ce document (devis, facture ou bon de commande) et extrait les informations suivantes en JSON uniquement, sans markdown.
+  const prompt = `Tu es un expert en lecture de documents commerciaux français. Analyse attentivement ce document (devis, facture, bon de commande) et extrais TOUTES les informations visibles.
 
-Format exact:
-{"client":"nom du client","email":"email du client si visible sinon vide","ht":montant_ht_nombre,"ttc":montant_ttc_nombre,"desc":"objet ou description courte","date":"JJ/MM/AAAA","num":"numero du devis si visible sinon vide","status":"signe"}
+Réponds UNIQUEMENT avec ce JSON, sans markdown, sans texte avant ou après:
+{"client":"nom complet du client ou de l'entreprise cliente","email":"email du client si visible sinon vide","ht":montant_ht_en_nombre,"ttc":montant_ttc_en_nombre,"desc":"objet ou description de la prestation en max 50 caractères","date":"JJ/MM/AAAA","num":"numéro du devis ou facture si visible sinon vide","status":"signe"}
 
-Règles:
-- ht: montant total HT en nombre (ex: 773.00), 0 si absent
-- ttc: montant total TTC en nombre (ex: 850.30), 0 si absent
-- Si seulement un total est visible, calcule l'autre (TVA 10%)
-- email: adresse email du client si visible dans le document
-- date: date du devis au format JJ/MM/AAAA
-- desc: description courte de la prestation (max 50 caractères)
-- status: toujours "signe" pour un ancien devis
-- Si une info est absente, mets une chaîne vide "" ou 0 pour les nombres`;
+Règles IMPORTANTES:
+- client: cherche "Client :", "Destinataire :", "Adressé à :", "Facturé à :" etc.
+- ht: cherche "Total HT", "Montant HT", "Sous-total" - mets le nombre exact sans €
+- ttc: cherche "Total TTC", "Net à payer", "Total à régler" - mets le nombre exact sans €
+- Si tu vois seulement HT: calcule TTC = HT * 1.1 (TVA 10%) ou HT * 1.2 (TVA 20%)
+- Si tu vois seulement TTC: calcule HT = TTC / 1.1
+- date: cherche "Date :", "Émis le", "Le " suivi d'une date
+- num: cherche "Devis n°", "Facture n°", "N° ", "Réf."
+- Si une info est absente mets "" ou 0`;
 
   const msgContent = isImage
     ? [
