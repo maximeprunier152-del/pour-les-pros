@@ -1405,7 +1405,6 @@ async function loadUserData() {
 
   renderDash();
   renderCat();
-  renderCatChips(); // Chips pour le formulaire
   // S'assurer que la page devis est active par défaut
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-devis').classList.add('active');
@@ -1414,6 +1413,8 @@ async function loadUserData() {
   document.querySelectorAll('.bottom-nav-item').forEach(x=>x.classList.remove('active'));
   const bn = document.getElementById('bn-devis');
   if(bn) bn.classList.add('active');
+  // Attendre que le DOM soit prêt avant de rendre les chips
+  setTimeout(() => { renderCatChips(); }, 100);
   toast('👋', `Bonjour ${currentUser.name.split(' ')[0]} !`);
 }
 
@@ -1464,7 +1465,7 @@ async function switchTab(m, btn) {
       const { data } = await sb.from('catalogue').select('*').eq('user_email',currentUser.email).order('id',{ascending:true});
       if(data) catalogue = data;
     }
-    renderCatChips();
+    setTimeout(() => { renderCatChips(); }, 50);
   }
 }
 
@@ -1521,9 +1522,14 @@ function addL(){
 function renderCatChips() {
   const chips = document.getElementById('cat-chips');
   if (!chips) return;
+  if (!catalogue.length) { chips.innerHTML = ''; return; }
   chips.innerHTML = catalogue.map((c,i)=>
     `<button class="cat-chip" onclick="addFromCat(${i})">${c.name} — ${c.prix}€</button>`
   ).join('');
+  // Forcer le re-render si le parent est caché puis réaffiché
+  chips.style.display = 'none';
+  chips.offsetHeight; // force reflow
+  chips.style.display = '';
 }
 function addFromCat(idx) {
   const item=catalogue[idx]; if(!item) return;
