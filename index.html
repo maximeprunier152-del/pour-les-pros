@@ -1054,8 +1054,8 @@ function showAuthError(msg) {
 }
 
 function doLogin() {
-  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-  const pwd = document.getElementById('loginPwd').value;
+  const email = document.getElementById('li-email').value.trim().toLowerCase();
+  const pwd = document.getElementById('li-pwd').value;
   if (!email || !pwd) { showAuthError('Veuillez remplir tous les champs.'); return; }
   const users = getUsers();
   const user = users[email];
