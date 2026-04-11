@@ -1306,7 +1306,7 @@ async function doRegister() {
   }
 }
 
-function loginSuccess(user) {
+async function loginSuccess(user) {
   currentUser = user;
   document.getElementById('authScreen').classList.add('hidden');
   if (user.company) {
@@ -1318,7 +1318,7 @@ function loginSuccess(user) {
   document.getElementById('userBar').classList.add('show');
   document.getElementById('userBarName').textContent = user.company || user.name;
   document.getElementById('userBarEmail').textContent = user.name + ' · ' + user.email;
-  loadUserData();
+  await loadUserData();
 }
 
 function doLogout() {
@@ -1359,18 +1359,37 @@ async function loadUserData() {
   if (!currentUser) return;
   try {
     // Charger catalogue depuis Supabase
-    const { data: catData } = await sb.from('catalogue').select('*').eq('user_email', currentUser.email);
+    const { data: catData, error: catErr } = await sb
+      .from('catalogue')
+      .select('*')
+      .eq('user_email', currentUser.email)
+      .order('id', { ascending: true });
+
+    if (catErr) console.error('Catalogue error:', catErr);
     catalogue = catData || [];
 
     // Charger devis depuis Supabase
-    const { data: devisData } = await sb.from('devis').select('*').eq('user_email', currentUser.email).order('created_at', { ascending: false });
+    const { data: devisData, error: devisErr } = await sb
+      .from('devis')
+      .select('*')
+      .eq('user_email', currentUser.email)
+      .order('created_at', { ascending: false });
+
+    if (devisErr) console.error('Devis error:', devisErr);
     history = (devisData || []).map(d => ({
       id: d.num, client: d.client, desc: d.description,
       ttc: d.ttc, ht: d.ht, date: d.date_devis,
       status: d.status, email: d.email_client
     }));
-  } catch(e) { catalogue = []; history = []; }
-  renderDash(); renderCat(); renderCatChips();
+
+  } catch(e) {
+    console.error('loadUserData error:', e);
+    catalogue = []; history = [];
+  }
+
+  renderDash();
+  renderCat();
+  renderCatChips();
   toast('👋', `Bonjour ${currentUser.name.split(' ')[0]} !`);
 }
 
@@ -1756,7 +1775,7 @@ function renderCat() {
       </div>`;
     return;
   }
-  document.getElementById('cat-grid').innerHTML = catalogue.map(c=>`
+  document.getElementById('cat-grid').innerHTML = catalogue.map((c,i)=>`
     <div class="cat-card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <div class="cat-card-cat">${c.cat}</div>
@@ -1786,8 +1805,13 @@ function saveCat(){
 }
 function delCat(id){
   catalogue=catalogue.filter(c=>c.id!==id);
-  if(currentUser) sb.from('catalogue').delete().eq('id',id).eq('user_email',currentUser.email);
-  renderCat(); toast('🗑','Supprimé');
+  if(currentUser) {
+    sb.from('catalogue').delete().eq('id',id).eq('user_email',currentUser.email)
+      .then(({error}) => { if(error) console.error('Delete error:', error); });
+  }
+  renderCat();
+  renderCatChips();
+  toast('🗑','Supprimé');
 }
 
 
