@@ -1368,6 +1368,16 @@ async function loadUserData() {
     if (catErr) console.error('Catalogue error:', catErr);
     catalogue = catData || [];
 
+    // Si catalogue vide → insérer le catalogue par défaut
+    if (catalogue.length === 0) {
+      const catDefaut = DEFAULT_CATALOGUE.map(c => ({
+        user_email: currentUser.email, name: c.name, prix: c.prix, unit: c.unit, cat: c.cat
+      }));
+      await sb.from('catalogue').insert(catDefaut);
+      const { data: freshCat } = await sb.from('catalogue').select('*').eq('user_email',currentUser.email).order('id',{ascending:true});
+      catalogue = freshCat || DEFAULT_CATALOGUE;
+    }
+
     // Charger devis depuis Supabase
     const { data: devisData, error: devisErr } = await sb
       .from('devis')
@@ -1402,7 +1412,7 @@ let catalogue = [];
 let history = [];
 
 // ══ NAV ══
-function goPage(p) {
+async function goPage(p) {
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
@@ -1411,9 +1421,17 @@ function goPage(p) {
   document.querySelectorAll('.bottom-nav-item').forEach(x=>x.classList.remove('active'));
   const bn = document.getElementById('bn-'+p);
   if(bn) bn.classList.add('active');
-  if(p==='dash') renderDash();
-  if(p==='cat') renderCat();
-  // Scroll top on mobile
+  // Recharger depuis Supabase à chaque navigation
+  if(p==='cat' && currentUser) {
+    const { data } = await sb.from('catalogue').select('*').eq('user_email',currentUser.email).order('id',{ascending:true});
+    if(data) catalogue = data;
+    renderCat(); renderCatChips();
+  }
+  if(p==='dash' && currentUser) {
+    const { data } = await sb.from('devis').select('*').eq('user_email',currentUser.email).order('created_at',{ascending:false});
+    if(data) history = data.map(d=>({id:d.num,client:d.client,desc:d.description,ttc:d.ttc,ht:d.ht,date:d.date_devis,status:d.status,email:d.email_client}));
+    renderDash();
+  }
   window.scrollTo(0, 0);
 }
 
@@ -1787,21 +1805,27 @@ function renderCat() {
     </div>`).join('');
 }
 function openCatModal(){document.getElementById('m-cat').classList.add('open');}
-function saveCat(){
+async function saveCat(){
   const name=document.getElementById('mc-name').value.trim();
   const prix=parseFloat(document.getElementById('mc-prix').value)||0;
   const unit=document.getElementById('mc-unit').value;
   const cat=document.getElementById('mc-cat').value.trim()||'Général';
   if(!name) return;
-  const newItem = {id:Date.now(),name,prix,unit,cat};
-  catalogue.push(newItem);
+
+  closeModals();
+
   if(currentUser) {
-    sb.from('catalogue').insert([{user_email:currentUser.email,name,prix,unit,cat}]).then(()=>{
-      // Recharger le catalogue depuis Supabase pour avoir les vrais IDs
-      sb.from('catalogue').select('*').eq('user_email',currentUser.email).then(({data})=>{ if(data){catalogue=data; refreshAll();} });
-    });
+    // Insérer dans Supabase et attendre la réponse
+    await sb.from('catalogue').insert([{user_email:currentUser.email,name,prix,unit,cat}]);
+    // Recharger depuis Supabase avec les vrais IDs
+    const { data } = await sb.from('catalogue').select('*').eq('user_email',currentUser.email).order('id', {ascending:true});
+    if(data) catalogue = data;
+  } else {
+    catalogue.push({id:Date.now(),name,prix,unit,cat});
   }
-  closeModals(); renderCat(); toast('📦',`"${name}" ajouté`);
+  renderCat();
+  renderCatChips();
+  toast('📦',`"${name}" ajouté`);
 }
 function delCat(id){
   catalogue=catalogue.filter(c=>c.id!==id);
