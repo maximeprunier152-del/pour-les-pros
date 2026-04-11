@@ -1337,12 +1337,29 @@ function saveData() {
 function loadData() {
   // kept for compatibility
 }
+const DEFAULT_CATALOGUE = [
+  {id:1, name:"Main d'œuvre", prix:55, unit:"heure", cat:"Main d'œuvre", default:true},
+  {id:2, name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement", default:true},
+  {id:3, name:"Chauffe-eau 200L", prix:420, unit:"unité", cat:"Matériel", default:true},
+  {id:4, name:"Tableau électrique", prix:380, unit:"unité", cat:"Matériel", default:true},
+  {id:5, name:"Pose parquet", prix:45, unit:"m²", cat:"Pose", default:true},
+  {id:6, name:"Peinture murs", prix:18, unit:"m²", cat:"Pose", default:true},
+  {id:7, name:"Plomberie forfait", prix:120, unit:"forfait", cat:"Plomberie", default:true},
+  {id:8, name:"Installation électrique", prix:85, unit:"heure", cat:"Électricité", default:true},
+  {id:9, name:"Maçonnerie", prix:65, unit:"heure", cat:"Maçonnerie", default:true},
+];
+
 function loadUserData() {
   if (!currentUser) return;
   try {
-    catalogue = JSON.parse(localStorage.getItem(userKey('catalogue'))) || [];
-    history = JSON.parse(localStorage.getItem(userKey('history'))) || [];
-  } catch(e) { catalogue = []; history = []; }
+    const savedCat = localStorage.getItem(userKey('catalogue'));
+    const savedHist = localStorage.getItem(userKey('history'));
+    // Si c'est la première connexion → on charge le catalogue par défaut
+    catalogue = savedCat ? JSON.parse(savedCat) : [...DEFAULT_CATALOGUE];
+    history = savedHist ? JSON.parse(savedHist) : [];
+    // Si le catalogue est vide → on remet les défauts
+    if (!catalogue.length) catalogue = [...DEFAULT_CATALOGUE];
+  } catch(e) { catalogue = [...DEFAULT_CATALOGUE]; history = []; }
 }
 
 let catalogue = [];
@@ -1689,10 +1706,30 @@ function renderDash() {
 function doRelance(id){const d=history.find(x=>x.id===id);if(d){d.status='envoye';saveData();}renderDash();toast('📨',`Relance envoyée — ${id}`);}
 
 // ══ CATALOGUE ══
+const CAT_ICONS = {
+  "Main d'œuvre":"🔧","Déplacement":"🚗","Matériel":"📦","Pose":"🪚",
+  "Plomberie":"🚿","Électricité":"⚡","Maçonnerie":"🧱","Peinture":"🖌️",
+  "Menuiserie":"🪵","Chauffage":"🔥","Toiture":"🏠","Nettoyage":"🧹","Général":"📋"
+};
+function getCatIcon(cat) {
+  return CAT_ICONS[cat] || '📋';
+}
 function renderCat() {
-  document.getElementById('cat-grid').innerHTML=catalogue.map(c=>`
+  if (!catalogue.length) {
+    document.getElementById('cat-grid').innerHTML = `
+      <div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--text3);">
+        <div style="font-size:32px;margin-bottom:10px">📦</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:6px">Catalogue vide</div>
+        <div style="font-size:13px">Ajoutez vos prestations pour les retrouver rapidement lors de la création de devis</div>
+      </div>`;
+    return;
+  }
+  document.getElementById('cat-grid').innerHTML = catalogue.map(c=>`
     <div class="cat-card">
-      <div class="cat-card-cat">${c.cat}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="cat-card-cat">${c.cat}</div>
+        <span style="font-size:20px">${getCatIcon(c.cat)}</span>
+      </div>
       <div class="cat-card-name">${c.name}</div>
       <div class="cat-card-price">${c.prix} €<span class="cat-card-unit"> / ${c.unit}</span></div>
       <button class="cat-card-del" onclick="delCat(${c.id})">Supprimer</button>
