@@ -1718,17 +1718,43 @@ function exportPDF() {
     y+=7;
 
     pdf.setTextColor(17,17,17);
+    const PAGE_H = 297; // hauteur A4 en mm
+    const MARGIN_BOTTOM = 20; // marge bas
+    const ROW_H = 8;
+
     d.lignes.forEach((l,i)=>{
-      if(i%2===1){pdf.setFillColor(248,248,248);pdf.rect(M,y,W-2*M,8,'F');}
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(9);
-      pdf.text(l.desc,M+2,y+5.5);
+      // Saut de page si on dépasse la hauteur
+      if(y + ROW_H > PAGE_H - MARGIN_BOTTOM) {
+        pdf.addPage();
+        y = 18;
+        // Réafficher l'en-tête de tableau sur la nouvelle page
+        pdf.setFillColor(17,17,17); pdf.rect(M,y,W-2*M,7,'F');
+        pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(8);
+        pdf.text('DÉSIGNATION (suite)',M+2,y+4.8);
+        pdf.text('QTÉ',M+98,y+4.8,{align:'center'});
+        pdf.text('PU HT',M+120,y+4.8,{align:'center'});
+        pdf.text('TOTAL HT',W-M-2,y+4.8,{align:'right'});
+        pdf.setTextColor(17,17,17);
+        y+=7;
+      }
+      if(i%2===1){pdf.setFillColor(248,248,248);pdf.rect(M,y,W-2*M,ROW_H,'F');}
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(17,17,17);
+      // Tronquer la description si trop longue
+      const descTxt = l.desc.length > 50 ? l.desc.slice(0,47)+'...' : l.desc;
+      pdf.text(descTxt,M+2,y+5.5);
       pdf.text(String(l.qty),M+98,y+5.5,{align:'center'});
       pdf.text(f(l.pu)+' €',M+120,y+5.5,{align:'center'});
       pdf.setFont('helvetica','bold');
       pdf.text(f(l.total)+' €',W-M-2,y+5.5,{align:'right'});
-      y+=8;
+      y+=ROW_H;
     });
     y+=6;
+
+    // Saut de page si les totaux ne rentrent pas
+    if(y + 30 > PAGE_H - MARGIN_BOTTOM) {
+      pdf.addPage();
+      y = 18;
+    }
 
     pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(85,85,85);
     pdf.text('Total HT :',W-M-38,y); pdf.text(f(d.ht)+' €',W-M,y,{align:'right'}); y+=6;
@@ -2058,7 +2084,12 @@ function toast(icon,txt){
   document.getElementById('tt').textContent=txt;
   t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
 }
-function f(n){return(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function f(n) {
+  const num = parseFloat(n) || 0;
+  const parts = num.toFixed(2).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' '); // espace insécable
+  return parts.join(',');
+}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
 // ══ INIT ══
