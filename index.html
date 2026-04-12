@@ -1564,11 +1564,20 @@ async function generer() {
   let lignes=[];
 
   if(mode==='form') {
-    document.querySelectorAll('.ligne-row').forEach(r=>{
+    // Lire les lignes du formulaire
+    document.querySelectorAll('#lignes .ligne-row').forEach(r=>{
       const inputs=r.querySelectorAll('input');
-      const desc=inputs[0]?.value,qty=parseFloat(inputs[1]?.value)||1,pu=parseFloat(inputs[2]?.value)||0;
-      if(desc) lignes.push({desc,sous:'',qty,pu,total:qty*pu});
+      const desc=inputs[0]?.value?.trim();
+      const qty=parseFloat(inputs[1]?.value)||1;
+      const pu=parseFloat(inputs[2]?.value)||0;
+      if(desc && pu > 0) lignes.push({desc,sous:'',qty,pu,total:qty*pu});
     });
+    // Si aucune ligne valide, arrêter
+    if(!lignes.length) {
+      toast('⚠️','Ajoutez au moins une prestation avec un prix');
+      btn.disabled=false; aiRow.classList.remove('show');
+      return;
+    }
   } else {
     const steps=['Analyse de la description…','Identification des prestations…','Calcul des montants…','Mise en forme…'];
     for(const s of steps){ document.getElementById('aiTxt').textContent=s; await sleep(380+Math.random()*250); }
