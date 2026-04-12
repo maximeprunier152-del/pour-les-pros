@@ -2018,17 +2018,16 @@ function parseDevisText(text) {
   const emailMatch = t.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
   if (emailMatch) result.email = emailMatch[0];
 
-  // Numéro de devis
-  const numMatch = t.match(/(?:DEV|DEVIS|FAC|FACT|N[°o]|REF)[\s.-]*([0-9]{4}[-/][0-9]{3,}[-/]?[A-Z0-9]*)/i)
+  // Numero de devis
+  const numMatch = t.match(/(?:DEV|DEVIS|FAC|FACT|REF)[\s.-]*([0-9]{4}[-\/][0-9]{3,}[-\/]?[A-Z0-9]*)/i)
                 || t.match(/([A-Z]+-[0-9]{4}-[0-9]+)/);
   if (numMatch) result.num = numMatch[0].replace(/\s/g,'');
 
   // Total HT
   const htPatterns = [
-    /Total\s+HT\s*[:\s]+([0-9\s.,]+)\s*[€EUR]/i,
+    /Total\s+HT\s*[:\s]+([0-9\s.,]+)\s*[€E]/i,
     /Montant\s+HT\s*[:\s]+([0-9\s.,]+)/i,
-    /Sous.total\s*[:\s]+([0-9\s.,]+)/i,
-    /HT\s*[:\s]+([0-9\s.,]+)\s*[€EUR]/i,
+    /HT\s*[:\s]+([0-9\s.,]+)\s*[€E]/i,
   ];
   for (const p of htPatterns) {
     const m = t.match(p);
@@ -2037,53 +2036,40 @@ function parseDevisText(text) {
 
   // Total TTC
   const ttcPatterns = [
-    /Total\s+TTC\s*[:\s]+([0-9\s.,]+)\s*[€EUR]/i,
-    /Net\s+[àa]\s+payer\s*[:\s]+([0-9\s.,]+)/i,
-    /TTC\s*[:\s]+([0-9\s.,]+)\s*[€EUR]/i,
-    /Total\s+[àa]\s+r[eé]gler\s*[:\s]+([0-9\s.,]+)/i,
+    /Total\s+TTC\s*[:\s]+([0-9\s.,]+)\s*[€E]/i,
+    /Net\s+.{0,5}payer\s*[:\s]+([0-9\s.,]+)/i,
+    /TTC\s*[:\s]+([0-9\s.,]+)\s*[€E]/i,
   ];
   for (const p of ttcPatterns) {
     const m = t.match(p);
     if (m) { result.ttc = parseFloat(m[1].replace(/\s/g,'').replace(',','.')); break; }
   }
 
-  // Si HT sans TTC ou inversement → calculer
+  // Calculer l'un depuis l'autre si manquant
   if (result.ht && !result.ttc) result.ttc = Math.round(result.ht * 1.2 * 100) / 100;
   if (result.ttc && !result.ht) result.ht = Math.round(result.ttc / 1.2 * 100) / 100;
 
   // Date
-  const dateMatch = t.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/)
-                 || t.match(/(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})/i);
+  const dateMatch = t.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
   if (dateMatch) {
-    result.date = `${dateMatch[1].padStart(2,'0')}/${dateMatch[2].padStart(2,'0')}/${dateMatch[3]}`;
+    result.date = dateMatch[1].padStart(2,'0') + '/' + dateMatch[2].padStart(2,'0') + '/' + dateMatch[3];
   } else {
     result.date = new Date().toLocaleDateString('fr-FR');
   }
 
-  // Client - cherche après "Client :", "Destinataire :", etc.
-  const clientPatterns = [
-    /Client\s*[:\-]\s*
-?\s*([A-ZÀ-Ü][a-zA-ZÀ-ü\s.-]{2,40})/,
-    /Destinataire\s*[:\-]\s*
-?\s*([A-ZÀ-Ü][a-zA-ZÀ-ü\s.-]{2,40})/,
-    /Adress[eé]\s+[àa]\s*[:\-]\s*
-?\s*([A-ZÀ-Ü][a-zA-ZÀ-ü\s.-]{2,40})/,
-    /Factur[eé]\s+[àa]\s*[:\-]\s*
-?\s*([A-ZÀ-Ü][a-zA-ZÀ-ü\s.-]{2,40})/,
-  ];
-  for (const p of clientPatterns) {
-    const m = t.match(p);
-    if (m) { result.client = m[1].trim(); break; }
-  }
+  // Client
+  const clientMatch = t.match(/Client\s*[:\-]\s*([A-Za-z][A-Za-z\s.-]{2,40})/i)
+                    || t.match(/Destinataire\s*[:\-]\s*([A-Za-z][A-Za-z\s.-]{2,40})/i)
+                    || t.match(/Factur.{0,5}[:\-]\s*([A-Za-z][A-Za-z\s.-]{2,40})/i);
+  if (clientMatch) result.client = clientMatch[1].trim().split('  ')[0].trim();
 
-  // Description - première ligne substantielle après le numéro ou l'objet
-  const descMatch = t.match(/(?:Objet|Object|Prestation|Description)\s*[:\-]\s*([^
-
-]{5,60})/i);
+  // Description
+  const descMatch = t.match(/(?:Objet|Prestation|Description)\s*[:\-]\s*([^\n\r]{5,60})/i);
   if (descMatch) result.desc = descMatch[1].trim().slice(0, 50);
 
   return result;
 }
+
 
 async function extractWithClaude(file) {
   // Convertir fichier en base64
