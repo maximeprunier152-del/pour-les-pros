@@ -587,9 +587,18 @@ body {
   .cat-card-price { font-size: 18px; }
 
   .ligne-head { display: none; }
-  .ligne-row { grid-template-columns: 1fr auto auto auto 24px; padding: 10px 10px; }
-  .ligne-row input { font-size: 14px; }
-  .li-qty, .li-pu { width: 52px; }
+  .ligne-row {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 8px;
+  }
+  .ligne-row input { font-size: 14px; width: 100%; }
+  .ligne-row-nums {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 6px;
+    align-items: center;
+  }
 
   .doc-wrap { border-radius: 10px; }
   .doc-body { padding: 18px 14px; }
@@ -946,20 +955,6 @@ body {
           <div></div>
         </div>
         <div class="lignes-wrap" id="lignes">
-          <div class="ligne-row">
-            <input type="text" placeholder="Désignation" value="Main d'œuvre (3h)">
-            <input type="number" class="li-c" value="3" oninput="calcTot(this)">
-            <input type="number" class="li-c" value="55" oninput="calcTot(this)">
-            <div class="li-r">165,00 €</div>
-            <button class="li-del" onclick="delL(this)">×</button>
-          </div>
-          <div class="ligne-row">
-            <input type="text" placeholder="Désignation" value="Chauffe-eau 200L">
-            <input type="number" class="li-c" value="1" oninput="calcTot(this)">
-            <input type="number" class="li-c" value="420" oninput="calcTot(this)">
-            <div class="li-r">420,00 €</div>
-            <button class="li-del" onclick="delL(this)">×</button>
-          </div>
         </div>
         <button class="btn-add-ligne" onclick="addL()">+ Ajouter une ligne</button>
       </div>
@@ -1525,11 +1520,14 @@ function delL(btn){btn.closest('.ligne-row').remove();}
 function addL(){
   const wrap=document.getElementById('lignes'),d=document.createElement('div');
   d.className='ligne-row';
-  d.innerHTML=`<input type="text" placeholder="Désignation">
-    <input type="number" class="li-c" value="1" oninput="calcTot(this)">
-    <input type="number" class="li-c" value="0" oninput="calcTot(this)">
-    <div class="li-r">0,00 €</div>
-    <button class="li-del" onclick="delL(this)">×</button>`;
+  d.innerHTML=`
+    <input type="text" placeholder="Désignation de la prestation">
+    <div class="ligne-row-nums">
+      <input type="number" class="li-c" placeholder="Qté" value="1" oninput="calcTot(this)">
+      <input type="number" class="li-c" placeholder="PU HT €" value="0" oninput="calcTot(this)">
+      <div class="li-r">0,00 €</div>
+      <button class="li-del" onclick="delL(this)">×</button>
+    </div>`;
   wrap.appendChild(d);
 }
 function renderCatChips() {
@@ -1544,11 +1542,14 @@ function addFromCat(idx) {
   const item=catalogue[idx]; if(!item) return;
   const wrap=document.getElementById('lignes'),d=document.createElement('div');
   d.className='ligne-row';
-  d.innerHTML=`<input type="text" value="${item.name}">
-    <input type="number" class="li-c" value="1" oninput="calcTot(this)">
-    <input type="number" class="li-c" value="${item.prix}" oninput="calcTot(this)">
-    <div class="li-r">${f(item.prix)} €</div>
-    <button class="li-del" onclick="delL(this)">×</button>`;
+  d.innerHTML=`
+    <input type="text" value="${item.name}">
+    <div class="ligne-row-nums">
+      <input type="number" class="li-c" placeholder="Qté" value="1" oninput="calcTot(this)">
+      <input type="number" class="li-c" placeholder="PU HT €" value="${item.prix}" oninput="calcTot(this)">
+      <div class="li-r">${f(item.prix)} €</div>
+      <button class="li-del" onclick="delL(this)">×</button>
+    </div>`;
   wrap.appendChild(d);
   toast('📦',`"${item.name}" ajouté`);
 }
@@ -1566,10 +1567,11 @@ async function generer() {
   if(mode==='form') {
     // Lire les lignes du formulaire
     document.querySelectorAll('#lignes .ligne-row').forEach(r=>{
-      const inputs=r.querySelectorAll('input');
-      const desc=inputs[0]?.value?.trim();
-      const qty=parseFloat(inputs[1]?.value)||1;
-      const pu=parseFloat(inputs[2]?.value)||0;
+      const allInputs=r.querySelectorAll('input');
+      const desc=allInputs[0]?.value?.trim();
+      const numInputs=r.querySelectorAll('input[type=number]');
+      const qty=parseFloat(numInputs[0]?.value)||1;
+      const pu=parseFloat(numInputs[1]?.value)||0;
       if(desc && pu > 0) lignes.push({desc,sous:'',qty,pu,total:qty*pu});
     });
     // Si aucune ligne valide, arrêter
