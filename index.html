@@ -1400,7 +1400,8 @@ async function loadUserData() {
     history = (devisData || []).map(d => ({
       id: d.num, client: d.client, desc: d.description,
       ttc: d.ttc, ht: d.ht, date: d.date_devis,
-      status: d.status, email: d.email_client
+      status: d.status, email: d.email_client,
+      last_relance: d.last_relance || null
     }));
 
   } catch(e) {
@@ -1454,7 +1455,7 @@ async function goPage(p) {
   if(p==='devis') { renderCatChips(); }
   if(p==='dash' && currentUser) {
     const { data } = await sb.from('devis').select('*').eq('user_email',currentUser.email).order('created_at',{ascending:false});
-    if(data) history = data.map(d=>({id:d.num,client:d.client,desc:d.description,ttc:d.ttc,ht:d.ht,date:d.date_devis,status:d.status,email:d.email_client}));
+    if(data) history = data.map(d=>({id:d.num,client:d.client,desc:d.description,ttc:d.ttc,ht:d.ht,date:d.date_devis,status:d.status,email:d.email_client,last_relance:d.last_relance||null}));
     renderDash();
   }
   window.scrollTo(0, 0);
@@ -1827,12 +1828,36 @@ function renderDash() {
   document.getElementById('dc-attente').textContent=attente;
   document.getElementById('dc-ca').textContent=f(ca)+'€';
 
-  const relances=history.filter(d=>['attente','relance'].includes(d.status));
+  const SEVEN_DAYS = 7 * 24 * 3600 * 1000;
+  const now = Date.now();
+
+  // Afficher seulement les devis non signés ET non relancés depuis 7 jours
+  const relances = history.filter(d => {
+    // Exclure les signés
+    if (d.status === 'signe') return false;
+    // Si relancé récemment (moins de 7 jours), cacher
+    if (d.last_relance) {
+      const daysSince = now - new Date(d.last_relance).getTime();
+      if (daysSince < SEVEN_DAYS) return false;
+    }
+    // Afficher si jamais relancé ET statut non signé
+    return true;
+  });
+
   document.getElementById('relances-list').innerHTML=relances.length
-    ?relances.map(d=>`<div class="relance-row">
-      <div><div style="font-weight:600;font-size:13px">${d.client} — ${d.id}</div><div style="font-size:12px;color:var(--text3);margin-top:2px">${d.desc} · ${f(d.ttc)} € · ${d.date}</div></div>
-      <button class="btn-relance" onclick="doRelance('${d.id}')">Relancer</button>
-    </div>`).join('')
+    ?relances.map(d=>{
+      const lastRelanceText = d.last_relance
+        ? `Dernière relance : ${new Date(d.last_relance).toLocaleDateString('fr-FR')}`
+        : 'Jamais relancé';
+      return `<div class="relance-row">
+        <div>
+          <div style="font-weight:600;font-size:13px">${d.client} — ${d.id}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${d.desc} · ${f(d.ttc)} € · ${d.date}</div>
+          <div style="font-size:11px;color:var(--orange);margin-top:2px">${lastRelanceText}</div>
+        </div>
+        <button class="btn-relance" onclick="doRelance('${d.id}')">Relancer</button>
+      </div>`;
+    }).join('')
     :'<div style="font-size:13px;color:var(--text3);padding:12px 0">Aucune relance nécessaire.</div>';
 
   const SL={'envoye':'Envoyé','ouvert':'Ouvert','signe':'Signé','attente':'En attente','relance':'À relancer'};
@@ -1846,10 +1871,20 @@ function renderDash() {
     <td><span class="badge ${SC[d.status]}">${SL[d.status]}</span></td>
   </tr>`).join('');
 }
-function doRelance(id){
+async function doRelance(id){
   const d=history.find(x=>x.id===id);
-  if(d){ d.status='envoye'; if(currentUser) sb.from('devis').update({status:'envoye'}).eq('num',id).eq('user_email',currentUser.email); }
-  renderDash(); toast('📨',`Relance envoyée — ${id}`);
+  if(!d) return;
+  const now = new Date().toISOString();
+  d.status='envoye';
+  d.last_relance = now; // Sauvegarder la date de relance
+  if(currentUser) {
+    await sb.from('devis')
+      .update({ status:'envoye', last_relance: now })
+      .eq('num', id)
+      .eq('user_email', currentUser.email);
+  }
+  renderDash();
+  toast('📨',`Relance envoyée — réaffichage dans 7 jours`);
 }
 
 // ══ CATALOGUE ══
