@@ -2012,62 +2012,70 @@ async function extractTextFromPDF(file) {
   });
 }
 
-// Parser le texte extrait du PDF pour trouver les infos du devis
+// Parser le texte extrait du PDF
 function parseDevisText(text) {
   const t = text;
   const result = { client: '', email: '', ht: 0, ttc: 0, desc: '', date: '', num: '', status: 'signe' };
 
-  // Email
-  const emailMatch = t.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-  if (emailMatch) result.email = emailMatch[0];
+  // ── Trouver le bloc CLIENT d'abord ──
+  // Cherche tout ce qui est après "Client :" jusqu'au prochain bloc
+  const clientBlockMatch = t.match(/Client\s*[:\-]\s*(.{0,200}?)(?=Prestation|Total|Devis|Facture|Conditions|$)/is);
+  const clientBlock = clientBlockMatch ? clientBlockMatch[1] : '';
 
-  // Numero de devis
-  const numMatch = t.match(/(?:DEV|DEVIS|FAC|FACT|REF)[\s.-]*([0-9]{4}[-\/][0-9]{3,}[-\/]?[A-Z0-9]*)/i)
-                || t.match(/([A-Z]+-[0-9]{4}-[0-9]+)/);
-  if (numMatch) result.num = numMatch[0].replace(/\s/g,'');
-
-  // Total HT
-  const htPatterns = [
-    /Total\s+HT\s*[:\s]+([0-9\s.,]+)\s*[€E]/i,
-    /Montant\s+HT\s*[:\s]+([0-9\s.,]+)/i,
-    /HT\s*[:\s]+([0-9\s.,]+)\s*[€E]/i,
-  ];
-  for (const p of htPatterns) {
-    const m = t.match(p);
-    if (m) { result.ht = parseFloat(m[1].replace(/\s/g,'').replace(',','.')); break; }
+  // Email : chercher D'ABORD dans le bloc client, sinon dans tout le doc en dernier
+  const allEmails = [...t.matchAll(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g)].map(m => m[0]);
+  if (allEmails.length > 0) {
+    // Prendre le dernier email trouvé (souvent l'email client est après l'email de l'entreprise)
+    const emailInBlock = clientBlock.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    result.email = emailInBlock ? emailInBlock[0] : allEmails[allEmails.length - 1];
   }
+
+  // Client : première ligne non vide du bloc client
+  if (clientBlock) {
+    const lines = clientBlock.split(/\s{2,}|\n/).map(l => l.trim()).filter(l => l.length > 1);
+    // Prendre la 1ère ligne qui ressemble à un nom (pas une adresse, pas un email)
+    for (const line of lines) {
+      if (line.length > 2 && line.length < 50 && !line.includes('@') && !line.match(/^\d/) && !line.match(/rue|avenue|boulevard|bp|cedex/i)) {
+        result.client = line;
+        break;
+      }
+    }
+  }
+  // Fallback client
+  if (!result.client) {
+    const cm = t.match(/Client\s*[:\-]\s*([A-Za-zÀ-ü][A-Za-zÀ-ü\s.-]{2,30})/i);
+    if (cm) result.client = cm[1].trim();
+  }
+
+  // Numéro de devis
+  const numMatch = t.match(/(?:DEVIS|DEV|FAC|FACT|N[°o])[\s.-]*([0-9]{4}[^\s]{2,15})/i)
+                || t.match(/([A-Z]{2,}-[0-9]{4}-[0-9A-Z]+)/);
+  if (numMatch) result.num = numMatch[1] ? numMatch[1].trim() : numMatch[0].trim();
+
+  // Total HT — chercher en ignorant la TVA
+  const htMatch = t.match(/Total\s+HT\s*[:\s]*([0-9][0-9\s.,]*)/i)
+               || t.match(/Montant\s+HT\s*[:\s]*([0-9][0-9\s.,]*)/i);
+  if (htMatch) result.ht = parseFloat(htMatch[1].replace(/\s/g,'').replace(',','.')) || 0;
 
   // Total TTC
-  const ttcPatterns = [
-    /Total\s+TTC\s*[:\s]+([0-9\s.,]+)\s*[€E]/i,
-    /Net\s+.{0,5}payer\s*[:\s]+([0-9\s.,]+)/i,
-    /TTC\s*[:\s]+([0-9\s.,]+)\s*[€E]/i,
-  ];
-  for (const p of ttcPatterns) {
-    const m = t.match(p);
-    if (m) { result.ttc = parseFloat(m[1].replace(/\s/g,'').replace(',','.')); break; }
-  }
+  const ttcMatch = t.match(/Total\s+TTC\s*[:\s]*([0-9][0-9\s.,]*)/i)
+                || t.match(/Net\s+.{0,5}payer\s*[:\s]*([0-9][0-9\s.,]*)/i);
+  if (ttcMatch) result.ttc = parseFloat(ttcMatch[1].replace(/\s/g,'').replace(',','.')) || 0;
 
-  // Calculer l'un depuis l'autre si manquant
+  // Calculer l'un depuis l'autre
   if (result.ht && !result.ttc) result.ttc = Math.round(result.ht * 1.2 * 100) / 100;
   if (result.ttc && !result.ht) result.ht = Math.round(result.ttc / 1.2 * 100) / 100;
 
   // Date
-  const dateMatch = t.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
+  const dateMatch = t.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
   if (dateMatch) {
     result.date = dateMatch[1].padStart(2,'0') + '/' + dateMatch[2].padStart(2,'0') + '/' + dateMatch[3];
   } else {
     result.date = new Date().toLocaleDateString('fr-FR');
   }
 
-  // Client
-  const clientMatch = t.match(/Client\s*[:\-]\s*([A-Za-z][A-Za-z\s.-]{2,40})/i)
-                    || t.match(/Destinataire\s*[:\-]\s*([A-Za-z][A-Za-z\s.-]{2,40})/i)
-                    || t.match(/Factur.{0,5}[:\-]\s*([A-Za-z][A-Za-z\s.-]{2,40})/i);
-  if (clientMatch) result.client = clientMatch[1].trim().split('  ')[0].trim();
-
   // Description
-  const descMatch = t.match(/(?:Objet|Prestation|Description)\s*[:\-]\s*([^\n\r]{5,60})/i);
+  const descMatch = t.match(/(?:Objet|Description)\s*[:\-]\s*([^\n\r]{5,60})/i);
   if (descMatch) result.desc = descMatch[1].trim().slice(0, 50);
 
   return result;
