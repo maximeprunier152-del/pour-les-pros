@@ -433,6 +433,7 @@ body {
 .devis-table td { padding: 12px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
 .devis-table tr:last-child td { border-bottom: none; }
 .devis-table tr:hover td { background: var(--bg2); }
+.devis-table tbody tr:hover { background: var(--bg2); }
 .badge {
   display: inline-flex; align-items: center;
   padding: 3px 9px; border-radius: 20px;
@@ -1110,6 +1111,21 @@ body {
 </div><!-- /shell -->
 
 <!-- MODALS -->
+<!-- MODAL DETAIL DEVIS -->
+<div class="overlay" id="m-detail">
+  <div class="modal" style="width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="modal-title" style="margin-bottom:0" id="detail-title">Devis</div>
+      <button onclick="closeModals()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">×</button>
+    </div>
+    <div id="detail-body"></div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-cancel" onclick="closeModals()">Fermer</button>
+      <button class="btn-ok" onclick="closeModals();changeStatus(window._detailId,'signe')" id="detail-btn-sign" style="background:var(--green)">✅ Marquer signé</button>
+    </div>
+  </div>
+</div>
+
 <!-- IMPORT MODAL -->
 <div class="overlay" id="m-import">
   <div class="modal" style="width:520px;max-width:95vw;">
@@ -1862,7 +1878,7 @@ function renderDash() {
 
   const SL={'envoye':'Envoyé','ouvert':'Ouvert','signe':'Signé','attente':'En attente','relance':'À relancer'};
   const SC={'envoye':'b-envoye','ouvert':'b-ouvert','signe':'b-signe','attente':'b-attente','relance':'b-relance'};
-  document.getElementById('devis-tbody').innerHTML=history.map(d=>`<tr>
+  document.getElementById('devis-tbody').innerHTML=history.map(d=>`<tr style="cursor:pointer" onclick="openDevisDetail('${d.id}')" title="Cliquer pour consulter">
     <td style="font-weight:500;color:var(--text2)">${d.id}</td>
     <td style="font-weight:500">${d.client}</td>
     <td style="color:var(--text2)">${d.desc}</td>
@@ -2234,6 +2250,87 @@ async function confirmImport() {
   closeModals();
   renderDash();
   toast('✅', `Devis de ${client} ajouté !${status==='attente'?' Une relance peut être envoyée.':''}`);
+}
+
+
+// ══ DETAIL DEVIS ══
+function openDevisDetail(id) {
+  const d = history.find(x => x.id === id);
+  if (!d) return;
+  window._detailId = id;
+
+  const SL = {'envoye':'Envoyé','ouvert':'Ouvert','signe':'Signé','attente':'En attente','relance':'À relancer'};
+  const SC = {'envoye':'b-envoye','ouvert':'b-ouvert','signe':'b-signe','attente':'b-attente','relance':'b-relance'};
+
+  document.getElementById('detail-title').textContent = `Devis ${d.id}`;
+
+  // Cacher le bouton "Marquer signé" si déjà signé
+  const btnSign = document.getElementById('detail-btn-sign');
+  btnSign.style.display = d.status === 'signe' ? 'none' : 'flex';
+
+  document.getElementById('detail-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Client</div>
+        <div style="font-weight:600;font-size:15px">${d.client || '—'}</div>
+        ${d.email ? `<div style="font-size:12px;color:var(--text3);margin-top:2px">${d.email}</div>` : ''}
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Statut</div>
+        <span class="badge ${SC[d.status]}">${SL[d.status]}</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div style="background:var(--bg2);border-radius:8px;padding:12px;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Montant HT</div>
+        <div style="font-weight:700;font-size:16px">${f(d.ht || d.ttc/1.1)} €</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:12px;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">TVA (10%)</div>
+        <div style="font-weight:700;font-size:16px">${f((d.ttc||0) - (d.ht || d.ttc/1.1))} €</div>
+      </div>
+      <div style="background:var(--text);border-radius:8px;padding:12px;">
+        <div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:4px">Total TTC</div>
+        <div style="font-weight:700;font-size:16px;color:#fff">${f(d.ttc)} €</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Objet</div>
+        <div style="font-size:13px">${d.desc || '—'}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Date</div>
+        <div style="font-size:13px">${d.date || '—'}</div>
+      </div>
+    </div>
+
+    ${d.last_relance ? `
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;font-size:12px;color:var(--orange)">
+      📨 Dernière relance envoyée le ${new Date(d.last_relance).toLocaleDateString('fr-FR')}
+    </div>` : ''}
+
+    <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+      ${d.status !== 'signe' ? `<button class="btn-sm" style="background:var(--orange);color:#fff;border-color:var(--orange)" onclick="closeModals();doRelance('${d.id}')">📨 Relancer</button>` : ''}
+      <button class="btn-sm" onclick="closeModals();changeStatus('${d.id}','signe')" style="${d.status==='signe'?'display:none':''}">✅ Marquer signé</button>
+      <button class="btn-sm" onclick="closeModals();changeStatus('${d.id}','attente')">🔄 Remettre en attente</button>
+    </div>
+  `;
+
+  document.getElementById('m-detail').classList.add('open');
+}
+
+async function changeStatus(id, status) {
+  const d = history.find(x => x.id === id);
+  if (!d) return;
+  d.status = status;
+  if (currentUser) {
+    await sb.from('devis').update({ status }).eq('num', id).eq('user_email', currentUser.email);
+  }
+  renderDash();
+  toast(status === 'signe' ? '✅' : '🔄', status === 'signe' ? 'Devis marqué signé !' : 'Statut mis à jour');
 }
 
 // ══ UTILS ══
