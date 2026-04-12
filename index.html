@@ -1593,12 +1593,15 @@ async function generer() {
   btn.disabled=false; btn.innerHTML='<span>↻</span> Regénérer';
   const newDevis = {id:num,client:data.cli||'Client',desc:devis.objet.slice(0,40),ttc,date:now.toLocaleDateString('fr-FR'),status:'attente',email:data.email};
   history.unshift(newDevis);
-  // Sauvegarder dans Supabase
-  if(currentUser) sb.from('devis').insert([{
-    user_email: currentUser.email, num, client: data.cli||'Client',
-    description: devis.objet.slice(0,40), ttc, ht: devis.ht,
-    email_client: data.email, date_devis: now.toLocaleDateString('fr-FR'), status: 'attente'
-  }]);
+  // Sauvegarder dans Supabase avec await
+  if(currentUser) {
+    const {error: insertErr} = await sb.from('devis').insert([{
+      user_email: currentUser.email, num, client: data.cli||'Client',
+      description: devis.objet.slice(0,40), ttc, ht: devis.ht,
+      email_client: data.email, date_devis: now.toLocaleDateString('fr-FR'), status: 'attente'
+    }]);
+    if(insertErr) console.error('Devis insert error:', insertErr);
+  }
 }
 
 function getData() {
@@ -2159,7 +2162,7 @@ function calcImportHT() {
   if (ttc) document.getElementById('imp-ht').value = Math.round(ttc / 1.1 * 100) / 100;
 }
 
-function confirmImport() {
+async function confirmImport() {
   const client = document.getElementById('imp-client').value.trim();
   const email = document.getElementById('imp-email').value.trim();
   const ttc = parseFloat(document.getElementById('imp-ttc').value) || 0;
@@ -2174,11 +2177,14 @@ function confirmImport() {
 
   const importedDevis = { id: num, client, desc, ttc: ttc || Math.round(ht*1.1*100)/100, ht, date, status, email, imported: true };
   history.push(importedDevis);
-  if(currentUser) sb.from('devis').insert([{
-    user_email: currentUser.email, num, client,
-    description: desc, ttc: importedDevis.ttc, ht,
-    email_client: email, date_devis: date, status
-  }]);
+  if(currentUser) {
+    const {error: impErr} = await sb.from('devis').insert([{
+      user_email: currentUser.email, num, client,
+      description: desc, ttc: importedDevis.ttc, ht,
+      email_client: email, date_devis: date, status
+    }]);
+    if(impErr) console.error('Import insert error:', impErr);
+  }
   closeModals();
   renderDash();
   toast('✅', `Devis de ${client} ajouté !${status==='attente'?' Une relance peut être envoyée.':''}`);
