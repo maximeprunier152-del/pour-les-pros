@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root {
   --bg: #ffffff;
@@ -1988,22 +1989,24 @@ async function processImportFile(file) {
 async function extractTextFromPDF(file) {
   return new Promise((resolve) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        // Lire le contenu binaire du PDF et extraire les chaînes de texte
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         const arr = new Uint8Array(e.target.result);
-        let text = '';
-        for (let i = 0; i < arr.length; i++) {
-          const c = arr[i];
-          if (c >= 32 && c < 127) text += String.fromCharCode(c);
-          else if (c === 10 || c === 13) text += ' ';
+        const pdf = await pdfjsLib.getDocument({ data: arr }).promise;
+        let fullText = '';
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map(item => item.str).join(' ');
+          fullText += pageText + ' ';
         }
-        // Nettoyer et garder les parties lisibles
-        text = text.replace(/[^ -~ -ÿ]/g, ' ')
-                   .replace(/\s+/g, ' ')
-                   .trim();
-        resolve(text);
-      } catch(e) { resolve(''); }
+        resolve(fullText.trim());
+      } catch(err) {
+        console.error('PDF.js error:', err);
+        resolve('');
+      }
     };
     reader.readAsArrayBuffer(file);
   });
