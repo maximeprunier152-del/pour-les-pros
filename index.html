@@ -1953,17 +1953,27 @@ async function processImportFile(file) {
     await sleep(400 + Math.random() * 300);
   }
 
-  // Appel Claude API avec l'image
+  // Lire le texte du fichier et extraire localement
   try {
-    const extracted = await extractWithClaude(file);
+    let texte = '';
+    if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+      texte = await extractTextFromPDF(file);
+    } else if (file.type.startsWith('image/')) {
+      // Pour les images on essaie Claude, sinon fallback
+      try {
+        const extracted = await extractWithClaude(file);
+        fillImportFields(extracted);
+        aiRow.classList.remove('show');
+        result.classList.add('show');
+        return;
+      } catch(e) { texte = ''; }
+    }
+    const extracted = parseDevisText(texte);
     fillImportFields(extracted);
   } catch(e) {
+    console.error('Import error:', e);
     fillImportFields({
-      client: '',
-      email: '',
-      ht: 0,
-      ttc: 0,
-      desc: '',
+      client: '', email: '', ht: 0, ttc: 0, desc: '',
       date: new Date().toLocaleDateString('fr-FR'),
       num: 'DEV-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*900)+100),
       status: 'signe'
@@ -1972,6 +1982,107 @@ async function processImportFile(file) {
 
   aiRow.classList.remove('show');
   result.classList.add('show');
+}
+
+// Extraire le texte d'un PDF avec FileReader (lecture binaire → texte brut)
+async function extractTextFromPDF(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        // Lire le contenu binaire du PDF et extraire les chaînes de texte
+        const arr = new Uint8Array(e.target.result);
+        let text = '';
+        for (let i = 0; i < arr.length; i++) {
+          const c = arr[i];
+          if (c >= 32 && c < 127) text += String.fromCharCode(c);
+          else if (c === 10 || c === 13) text += ' ';
+        }
+        // Nettoyer et garder les parties lisibles
+        text = text.replace(/[^ -~ -ÿ]/g, ' ')
+                   .replace(/\s+/g, ' ')
+                   .trim();
+        resolve(text);
+      } catch(e) { resolve(''); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Parser le texte extrait du PDF pour trouver les infos du devis
+function parseDevisText(text) {
+  const t = text;
+  const result = { client: '', email: '', ht: 0, ttc: 0, desc: '', date: '', num: '', status: 'signe' };
+
+  // Email
+  const emailMatch = t.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch) result.email = emailMatch[0];
+
+  // Numéro de devis
+  const numMatch = t.match(/(?:DEV|DEVIS|FAC|FACT|N[°o]|REF)[\s.-]*([0-9]{4}[-/][0-9]{3,}[-/]?[A-Z0-9]*)/i)
+                || t.match(/([A-Z]+-[0-9]{4}-[0-9]+)/);
+  if (numMatch) result.num = numMatch[0].replace(/\s/g,'');
+
+  // Total HT
+  const htPatterns = [
+    /Total\s+HT\s*[:\s]+([0-9\s.,]+)\s*[€EUR]/i,
+    /Montant\s+HT\s*[:\s]+([0-9\s.,]+)/i,
+    /Sous.total\s*[:\s]+([0-9\s.,]+)/i,
+    /HT\s*[:\s]+([0-9\s.,]+)\s*[€EUR]/i,
+  ];
+  for (const p of htPatterns) {
+    const m = t.match(p);
+    if (m) { result.ht = parseFloat(m[1].replace(/\s/g,'').replace(',','.')); break; }
+  }
+
+  // Total TTC
+  const ttcPatterns = [
+    /Total\s+TTC\s*[:\s]+([0-9\s.,]+)\s*[€EUR]/i,
+    /Net\s+[àa]\s+payer\s*[:\s]+([0-9\s.,]+)/i,
+    /TTC\s*[:\s]+([0-9\s.,]+)\s*[€EUR]/i,
+    /Total\s+[àa]\s+r[eé]gler\s*[:\s]+([0-9\s.,]+)/i,
+  ];
+  for (const p of ttcPatterns) {
+    const m = t.match(p);
+    if (m) { result.ttc = parseFloat(m[1].replace(/\s/g,'').replace(',','.')); break; }
+  }
+
+  // Si HT sans TTC ou inversement → calculer
+  if (result.ht && !result.ttc) result.ttc = Math.round(result.ht * 1.2 * 100) / 100;
+  if (result.ttc && !result.ht) result.ht = Math.round(result.ttc / 1.2 * 100) / 100;
+
+  // Date
+  const dateMatch = t.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/)
+                 || t.match(/(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})/i);
+  if (dateMatch) {
+    result.date = `${dateMatch[1].padStart(2,'0')}/${dateMatch[2].padStart(2,'0')}/${dateMatch[3]}`;
+  } else {
+    result.date = new Date().toLocaleDateString('fr-FR');
+  }
+
+  // Client - cherche après "Client :", "Destinataire :", etc.
+  const clientPatterns = [
+    /Client\s*[:\-]\s*
+?\s*([A-ZÀ-Ü][a-zA-ZÀ-ü\s.-]{2,40})/,
+    /Destinataire\s*[:\-]\s*
+?\s*([A-ZÀ-Ü][a-zA-ZÀ-ü\s.-]{2,40})/,
+    /Adress[eé]\s+[àa]\s*[:\-]\s*
+?\s*([A-ZÀ-Ü][a-zA-ZÀ-ü\s.-]{2,40})/,
+    /Factur[eé]\s+[àa]\s*[:\-]\s*
+?\s*([A-ZÀ-Ü][a-zA-ZÀ-ü\s.-]{2,40})/,
+  ];
+  for (const p of clientPatterns) {
+    const m = t.match(p);
+    if (m) { result.client = m[1].trim(); break; }
+  }
+
+  // Description - première ligne substantielle après le numéro ou l'objet
+  const descMatch = t.match(/(?:Objet|Object|Prestation|Description)\s*[:\-]\s*([^
+
+]{5,60})/i);
+  if (descMatch) result.desc = descMatch[1].trim().slice(0, 50);
+
+  return result;
 }
 
 async function extractWithClaude(file) {
