@@ -257,13 +257,14 @@ body {
 .lh.c { text-align: center; }
 
 .ligne-row {
-  display: grid; grid-template-columns: 1fr 56px 72px 72px 28px;
+  display: grid; grid-template-columns: 1fr 56px 80px 72px 28px;
   gap: 6px; align-items: center;
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 8px; margin-bottom: 6px;
   transition: border-color 0.15s;
 }
+.num-label { display: none; }
 .ligne-row:hover { border-color: var(--border2); }
 .ligne-row input {
   background: transparent; border: none; padding: 0; margin: 0;
@@ -589,16 +590,36 @@ body {
 
   .ligne-head { display: none; }
   .ligne-row {
-    grid-template-columns: 1fr;
-    padding: 12px;
-    gap: 8px;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    padding: 10px 12px;
+    gap: 4px 8px;
+    align-items: start;
   }
-  .ligne-row input { font-size: 14px; width: 100%; }
+  .ligne-row > input[type=text] {
+    grid-column: 1; grid-row: 1;
+    font-size: 15px; font-weight: 500;
+  }
   .ligne-row-nums {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr auto;
-    gap: 6px;
-    align-items: center;
+    grid-column: 1; grid-row: 2;
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: nowrap;
+  }
+  .ligne-row > .li-del {
+    grid-column: 2; grid-row: 1 / 3;
+    align-self: center;
+  }
+  .ligne-row-nums input[type=number] {
+    width: 52px; font-size: 13px;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 6px; text-align: center;
+  }
+  .ligne-row-nums .num-label {
+    font-size: 10px; color: var(--text3); white-space: nowrap;
+  }
+  .ligne-row-nums .li-r {
+    font-size: 14px; font-weight: 700; color: var(--text);
+    margin-left: auto; white-space: nowrap;
   }
 
   .doc-wrap { border-radius: 10px; }
@@ -1540,11 +1561,13 @@ function addL(){
   d.className='ligne-row';
   d.innerHTML=`
     <input type="text" placeholder="Désignation de la prestation">
+    <button class="li-del" onclick="delL(this)">×</button>
     <div class="ligne-row-nums">
-      <input type="number" class="li-c" placeholder="Qté" value="1" oninput="calcTot(this)">
-      <input type="number" class="li-c" placeholder="PU HT €" value="0" oninput="calcTot(this)">
+      <span class="num-label">Qté</span>
+      <input type="number" class="li-c" placeholder="1" value="1" oninput="calcTot(this)">
+      <span class="num-label">PU HT</span>
+      <input type="number" class="li-c" placeholder="0" value="0" oninput="calcTot(this)">
       <div class="li-r">0,00 €</div>
-      <button class="li-del" onclick="delL(this)">×</button>
     </div>`;
   wrap.appendChild(d);
 }
@@ -1562,11 +1585,13 @@ function addFromCat(idx) {
   d.className='ligne-row';
   d.innerHTML=`
     <input type="text" value="${item.name}">
+    <button class="li-del" onclick="delL(this)">×</button>
     <div class="ligne-row-nums">
-      <input type="number" class="li-c" placeholder="Qté" value="1" oninput="calcTot(this)">
-      <input type="number" class="li-c" placeholder="PU HT €" value="${item.prix}" oninput="calcTot(this)">
+      <span class="num-label">Qté</span>
+      <input type="number" class="li-c" placeholder="1" value="1" oninput="calcTot(this)">
+      <span class="num-label">PU HT</span>
+      <input type="number" class="li-c" placeholder="0" value="${item.prix}" oninput="calcTot(this)">
       <div class="li-r">${f(item.prix)} €</div>
-      <button class="li-del" onclick="delL(this)">×</button>
     </div>`;
   wrap.appendChild(d);
   toast('📦',`"${item.name}" ajouté`);
