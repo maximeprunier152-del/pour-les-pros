@@ -3107,29 +3107,69 @@ function handleCachetUpload(input) {
   const file = input.files[0];
   if (!file) return;
   if (file.size > 2 * 1024 * 1024) { toast('⚠️', 'Image trop lourde (max 2 Mo)'); return; }
+
+  const isSVG = file.type === 'image/svg+xml' || file.name.endsWith('.svg');
+
   const reader = new FileReader();
   reader.onload = e => {
-    // Convertir en PNG via canvas pour compatibilité jsPDF (SVG, JPEG, WebP...)
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ratio = Math.min(600/img.width, 240/img.height, 1);
-      canvas.width = Math.round(img.width * ratio);
-      canvas.height = Math.round(img.height * ratio);
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const pngBase64 = canvas.toDataURL('image/png');
+    const result = e.target.result;
+
+    const convertToPNG = (src) => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxW = 600, maxH = 240;
+          const ratio = Math.min(maxW / (img.width||300), maxH / (img.height||120), 1);
+          canvas.width = Math.round((img.width||300) * ratio);
+          canvas.height = Math.round((img.height||120) * ratio);
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = reject;
+        img.src = src;
+      });
+    };
+
+    const saveCachet = (pngBase64) => {
       localStorage.setItem('cachet_' + currentUser.email, pngBase64);
       currentUser._cachet = pngBase64;
       loadCachetPreview();
       toast('✅', 'Cachet enregistré !');
     };
-    img.onerror = () => toast('⚠️', 'Format image non supporté');
-    img.src = e.target.result;
+
+    if (isSVG) {
+      // Pour SVG : lire comme texte et créer un blob URL
+      const svgText = isSVG && typeof result === 'string' && result.includes('<svg') ? result : null;
+      if (svgText) {
+        const blob = new Blob([svgText], {type: 'image/svg+xml'});
+        const url = URL.createObjectURL(blob);
+        convertToPNG(url)
+          .then(png => { URL.revokeObjectURL(url); saveCachet(png); })
+          .catch(() => {
+            // Fallback : stocker le dataURL SVG directement
+            saveCachet(result);
+          });
+      } else {
+        convertToPNG(result).then(saveCachet).catch(() => saveCachet(result));
+      }
+    } else {
+      convertToPNG(result).then(saveCachet).catch(() => {
+        // Fallback direct si canvas échoue
+        saveCachet(result);
+        toast('✅', 'Cachet enregistré !');
+      });
+    }
   };
-  reader.readAsDataURL(file);
+
+  if (isSVG) {
+    reader.readAsText(file);
+  } else {
+    reader.readAsDataURL(file);
+  }
 }
 
 function loadCachetPreview() {
