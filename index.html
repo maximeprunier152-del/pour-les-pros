@@ -1276,6 +1276,19 @@ body {
           <input type="password" id="re-pwd2" placeholder="••••••••" onkeydown="if(event.key==='Enter')doRegister()">
         </div>
       </div>
+      <div class="auth-field">
+        <label>Logo / Cachet <span style="font-weight:400;color:var(--text3)">(optionnel — apparaît sur vos devis)</span></label>
+        <div id="reg-cachet-zone" onclick="document.getElementById('reg-cachet-input').click()"
+          style="border:1.5px dashed var(--border2);border-radius:8px;padding:12px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg)"
+          onmouseenter="this.style.borderColor='var(--text)'" onmouseleave="this.style.borderColor='var(--border2)'">
+          <div id="reg-cachet-preview">
+            <div style="font-size:20px;margin-bottom:2px">🖼️</div>
+            <div style="font-size:12px;color:var(--text3)">Cliquez pour uploader · PNG, JPG, SVG</div>
+          </div>
+        </div>
+        <input type="file" id="reg-cachet-input" accept="image/*,.svg" style="display:none" onchange="handleRegCachet(this)">
+      </div>
+
       <button class="auth-btn" onclick="doRegister()">Créer mon compte →</button>
       <div class="auth-sep">Déjà un compte ? <a href="#" onclick="switchAuth('login');return false;" style="color:var(--blue);text-decoration:none;font-weight:500">Se connecter</a></div>
     </div>
@@ -1553,9 +1566,16 @@ async function loginSuccess(user) {
   if(uName) uName.textContent = user.company || user.name;
   if(uEmail) uEmail.textContent = user.email;
   await loadUserData();
-  // Charger le cachet depuis localStorage
-  const cachet = localStorage.getItem('cachet_' + user.email);
-  if (cachet) user._cachet = cachet;
+  // Sauvegarder le cachet uploadé à l'inscription si présent
+  if (window._pendingCachet) {
+    localStorage.setItem('cachet_' + user.email, window._pendingCachet);
+    user._cachet = window._pendingCachet;
+    window._pendingCachet = null;
+  } else {
+    // Charger le cachet depuis localStorage
+    const cachet = localStorage.getItem('cachet_' + user.email);
+    if (cachet) user._cachet = cachet;
+  }
 }
 
 function doLogout() {
@@ -3118,6 +3138,59 @@ function openSettings() {
   updateSettingsPreview();
   // Charger le cachet si existant
   loadCachetPreview();
+}
+
+function handleRegCachet(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const isSVG = file.type === 'image/svg+xml' || file.name.endsWith('.svg');
+  const reader = new FileReader();
+  reader.onload = e => {
+    const result = e.target.result;
+    const convertAndStore = (src) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ratio = Math.min(600/img.width, 240/img.height, 1);
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const png = canvas.toDataURL('image/png');
+        // Stocker temporairement (sera sauvegardé après inscription avec l'email)
+        window._pendingCachet = png;
+        const prev = document.getElementById('reg-cachet-preview');
+        if (prev) prev.innerHTML = `<img src="${png}" style="max-height:50px;max-width:100%;border-radius:4px;object-fit:contain" alt="Logo"><div style="font-size:11px;color:var(--green);margin-top:4px;font-weight:600">✅ Logo prêt</div>`;
+      };
+      img.onerror = () => { window._pendingCachet = src; };
+      img.src = src;
+    };
+    if (isSVG) {
+      const blob = new Blob([result], {type:'image/svg+xml'});
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width || 600; canvas.height = img.height || 200;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(img,0,0);
+        URL.revokeObjectURL(url);
+        const png = canvas.toDataURL('image/png');
+        window._pendingCachet = png;
+        const prev = document.getElementById('reg-cachet-preview');
+        if (prev) prev.innerHTML = `<img src="${png}" style="max-height:50px;max-width:100%;border-radius:4px;object-fit:contain" alt="Logo"><div style="font-size:11px;color:var(--green);margin-top:4px;font-weight:600">✅ Logo prêt</div>`;
+      };
+      img.onerror = () => convertAndStore(result);
+      img.src = url;
+    } else {
+      convertAndStore(result);
+    }
+  };
+  if (isSVG) reader.readAsText(file);
+  else reader.readAsDataURL(file);
 }
 
 function handleCachetUpload(input) {
