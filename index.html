@@ -2177,9 +2177,12 @@ function validerSignature() {
 
 // ══ PDF ══
 // Générer un PDF depuis l'historique (sans avoir le devis ouvert)
-function exportPDFFromHistory(id) {
+async function exportPDFFromHistory(id) {
   const d = history.find(x => x.id === id);
   if (!d) { toast('⚠️', 'Devis introuvable'); return; }
+
+  // Précharger le cachet avant de générer le PDF
+  const cachetDataUrl = await preloadCachet();
 
   try {
     const {jsPDF} = window.jspdf;
@@ -2299,6 +2302,10 @@ function exportPDFFromHistory(id) {
     pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(150,150,150);
     pdf.text('Cachet prestataire', M+2, y+4);
     pdf.text('Bon pour accord — Signature client', M+colWH+10, y+4);
+    // Injecter le cachet prestataire
+    if (cachetDataUrl) {
+      try { pdf.addImage(cachetDataUrl, 'PNG', M+2, y+6, colWH-4, 20); } catch(e) {}
+    }
     // Intégrer la signature dessinée si elle existe
     if (devis && devis.signatureImg && d.id === devis.num) {
       try {
@@ -2322,9 +2329,13 @@ function exportPDFFromHistory(id) {
   }
 }
 
-function exportPDF() {
+async function exportPDF() {
   if(!devis) return;
   const d=devis;
+
+  // Précharger le cachet avant de générer le PDF
+  const cachetDataUrl = await preloadCachet();
+
   try {
     const {jsPDF}=window.jspdf;
     const pdf=new jsPDF({unit:'mm',format:'a4'});
@@ -2425,11 +2436,9 @@ function exportPDF() {
     pdf.text('Cachet prestataire', M+2, y+4);
     pdf.text("Bon pour accord — Signature client", M+colW+10, y+4);
     // Injecter le cachet prestataire si présent
-    const cachetImg = getCachet();
-    if (cachetImg) {
+    if (cachetDataUrl) {
       try {
-        // Dimensions fixes : remplir la zone cachet (colW x 26mm)
-        pdf.addImage(cachetImg, 'PNG', M+2, y+6, colW-4, 20);
+        pdf.addImage(cachetDataUrl, 'PNG', M+2, y+6, colW-4, 20);
       } catch(e) { console.error('Cachet error:', e); }
     }
     // Intégrer la signature dessinée si elle existe
@@ -3210,6 +3219,28 @@ function removeCachet() {
 function getCachet() {
   if (!currentUser) return null;
   return currentUser._cachet || localStorage.getItem('cachet_' + currentUser.email) || null;
+}
+
+// Précharger le cachet comme Image pour garantir que jsPDF peut l'utiliser
+function preloadCachet() {
+  return new Promise((resolve) => {
+    const src = getCachet();
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.onload = () => {
+      // Redessiner sur canvas pour obtenir un PNG propre
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || 600;
+      canvas.height = img.naturalHeight || 200;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(src); // fallback: utiliser tel quel
+    img.src = src;
+  });
 }
 
 function updateSettingsPreview() {
