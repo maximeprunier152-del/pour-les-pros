@@ -1474,12 +1474,22 @@ async function loadUserData() {
       .order('created_at', { ascending: false });
 
     if (devisErr) console.error('Devis error:', devisErr);
-    history = (devisData || []).map(d => ({
-      id: d.num, client: d.client, desc: d.description,
-      ttc: d.ttc, ht: d.ht, date: d.date_devis,
-      status: d.status, email: d.email_client,
-      last_relance: d.last_relance || null
-    }));
+    history = (devisData || []).map(d => {
+      // Essayer de parser les lignes depuis description JSON
+      let lignes = null;
+      let desc = d.description || '';
+      try {
+        const parsed = JSON.parse(d.description);
+        if (Array.isArray(parsed)) { lignes = parsed; desc = parsed.map(l=>l.desc).join(', ').slice(0,40); }
+      } catch(e) {}
+      return {
+        id: d.num, client: d.client, desc,
+        ttc: d.ttc, ht: d.ht, date: d.date_devis,
+        status: d.status, email: d.email_client,
+        last_relance: d.last_relance || null,
+        lignes // null si ancien devis sans lignes
+      };
+    });
 
   } catch(e) {
     console.error('loadUserData error:', e);
@@ -1532,7 +1542,11 @@ async function goPage(p) {
   if(p==='devis') { renderCatChips(); }
   if(p==='dash' && currentUser) {
     const { data } = await sb.from('devis').select('*').eq('user_email',currentUser.email).order('created_at',{ascending:false});
-    if(data) history = data.map(d=>({id:d.num,client:d.client,desc:d.description,ttc:d.ttc,ht:d.ht,date:d.date_devis,status:d.status,email:d.email_client,last_relance:d.last_relance||null}));
+    if(data) history = data.map(d => {
+      let lignes = null; let desc = d.description || '';
+      try { const p = JSON.parse(d.description); if(Array.isArray(p)){lignes=p;desc=p.map(l=>l.desc).join(', ').slice(0,40);} } catch(e){}
+      return {id:d.num,client:d.client,desc,ttc:d.ttc,ht:d.ht,date:d.date_devis,status:d.status,email:d.email_client,last_relance:d.last_relance||null,lignes};
+    });
     renderDash();
   }
   window.scrollTo(0, 0);
@@ -1690,9 +1704,11 @@ async function generer() {
   history.unshift(newDevis);
   // Sauvegarder dans Supabase avec await
   if(currentUser) {
+    // Stocker les lignes détaillées en JSON dans description
+    const lignesJSON = JSON.stringify(devis.lignes || []);
     const {error: insertErr} = await sb.from('devis').insert([{
       user_email: currentUser.email, num, client: data.cli||'Client',
-      description: devis.objet.slice(0,40), ttc, ht: devis.ht,
+      description: lignesJSON, ttc, ht: devis.ht,
       email_client: data.email, date_devis: now.toLocaleDateString('fr-FR'), status: 'attente'
     }]);
     if(insertErr) console.error('Devis insert error:', insertErr);
@@ -1928,16 +1944,30 @@ function exportPDFFromHistory(id) {
     pdf.text('TOTAL HT', W-M-2, y+4.8, {align:'right'});
     y+=7;
 
-    // Ligne description
+    // Lignes détaillées si dispo, sinon une ligne résumé
+    const PAGE_H_H = 297, MARGIN_BOT_H = 20, ROW_H_H = 8;
+    const lignesDetail = (d.lignes && d.lignes.length) ? d.lignes : [{desc: d.desc||'Prestation', qty:1, pu:ht, total:ht}];
     pdf.setTextColor(17,17,17);
-    pdf.setFillColor(248,248,248); pdf.rect(M, y, W-2*M, 8, 'F');
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(9);
-    pdf.text(d.desc || 'Prestation', M+2, y+5.5);
-    pdf.text('1', M+98, y+5.5, {align:'center'});
-    pdf.text(f(ht)+' €', M+120, y+5.5, {align:'center'});
-    pdf.setFont('helvetica','bold');
-    pdf.text(f(ht)+' €', W-M-2, y+5.5, {align:'right'});
-    y+=8+6;
+    lignesDetail.forEach((l, i) => {
+      if(y + ROW_H_H > PAGE_H_H - MARGIN_BOT_H) {
+        pdf.addPage(); y=18;
+        pdf.setFillColor(17,17,17); pdf.rect(M,y,W-2*M,7,'F');
+        pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(8);
+        pdf.text('DÉSIGNATION (suite)',M+2,y+4.8); pdf.text('QTÉ',M+98,y+4.8,{align:'center'});
+        pdf.text('PU HT',M+120,y+4.8,{align:'center'}); pdf.text('TOTAL HT',W-M-2,y+4.8,{align:'right'});
+        pdf.setTextColor(17,17,17); y+=7;
+      }
+      if(i%2===1){pdf.setFillColor(248,248,248);pdf.rect(M,y,W-2*M,ROW_H_H,'F');}
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(17,17,17);
+      const dt = (l.desc||'').length>50?(l.desc||'').slice(0,47)+'...':(l.desc||'');
+      pdf.text(dt, M+2, y+5.5);
+      pdf.text(String(l.qty||1), M+98, y+5.5, {align:'center'});
+      pdf.text(f(l.pu||l.prix||0)+' €', M+120, y+5.5, {align:'center'});
+      pdf.setFont('helvetica','bold');
+      pdf.text(f(l.total||0)+' €', W-M-2, y+5.5, {align:'right'});
+      y+=ROW_H_H;
+    });
+    y+=6;
 
     // ── TOTAUX ──
     pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(85,85,85);
