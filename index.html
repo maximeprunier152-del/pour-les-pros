@@ -820,6 +820,20 @@ body {
 .auth-success.show { display: block; }
 .auth-sep { text-align: center; font-size: 12px; color: var(--text3); margin: 16px 0; }
 
+.metier-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px;
+}
+.metier-card {
+  border: 2px solid var(--border); border-radius: 10px;
+  padding: 10px 6px; text-align: center; cursor: pointer;
+  transition: all .2s; background: var(--bg);
+  user-select: none;
+}
+.metier-card:hover { border-color: var(--border2); background: var(--bg2); }
+.metier-card.selected { border-color: var(--text); background: var(--text); color: #fff; }
+.metier-card .mc-icon { font-size: 22px; margin-bottom: 4px; }
+.metier-card .mc-label { font-size: 11px; font-weight: 600; }
+
 /* User badge in sidebar */
 .user-badge {
   margin-top: auto; padding: 10px 12px;
@@ -1181,6 +1195,23 @@ body {
         <input type="text" id="re-company" placeholder="Ex : Plomberie Durand" onkeydown="if(event.key==='Enter')doRegister()">
       </div>
       <div class="auth-field">
+        <label>Votre métier <span style="font-weight:400;color:var(--text3)">(plusieurs possibles)</span></label>
+        <div class="metier-grid" id="metier-grid">
+          <div class="metier-card" data-metier="plomberie" onclick="toggleMetier(this)"><div class="mc-icon">🔧</div><div class="mc-label">Plomberie</div></div>
+          <div class="metier-card" data-metier="electricite" onclick="toggleMetier(this)"><div class="mc-icon">⚡</div><div class="mc-label">Électricité</div></div>
+          <div class="metier-card" data-metier="menuiserie" onclick="toggleMetier(this)"><div class="mc-icon">🪚</div><div class="mc-label">Menuiserie</div></div>
+          <div class="metier-card" data-metier="maconnerie" onclick="toggleMetier(this)"><div class="mc-icon">🧱</div><div class="mc-label">Maçonnerie</div></div>
+          <div class="metier-card" data-metier="peinture" onclick="toggleMetier(this)"><div class="mc-icon">🖌️</div><div class="mc-label">Peinture</div></div>
+          <div class="metier-card" data-metier="toiture" onclick="toggleMetier(this)"><div class="mc-icon">🏠</div><div class="mc-label">Toiture</div></div>
+          <div class="metier-card" data-metier="chauffage" onclick="toggleMetier(this)"><div class="mc-icon">🔥</div><div class="mc-label">Chauffage</div></div>
+          <div class="metier-card" data-metier="climatisation" onclick="toggleMetier(this)"><div class="mc-icon">❄️</div><div class="mc-label">Climatisation</div></div>
+          <div class="metier-card" data-metier="jardinage" onclick="toggleMetier(this)"><div class="mc-icon">🌿</div><div class="mc-label">Jardinage</div></div>
+          <div class="metier-card" data-metier="carrelage" onclick="toggleMetier(this)"><div class="mc-icon">⬜</div><div class="mc-label">Carrelage</div></div>
+          <div class="metier-card" data-metier="nettoyage" onclick="toggleMetier(this)"><div class="mc-icon">🧹</div><div class="mc-label">Nettoyage</div></div>
+          <div class="metier-card" data-metier="autre" onclick="toggleMetier(this)"><div class="mc-icon">🛠️</div><div class="mc-label">Autre</div></div>
+        </div>
+      </div>
+      <div class="auth-field">
         <label>Votre prénom</label>
         <input type="text" id="re-name" placeholder="Jean" onkeydown="if(event.key==='Enter')doRegister()">
       </div>
@@ -1422,10 +1453,9 @@ async function doRegister() {
 
     if (error) throw error;
 
-    // Insérer le catalogue par défaut
-    const catDefaut = DEFAULT_CATALOGUE.map(c => ({
-      user_email: email, name: c.name, prix: c.prix, unit: c.unit, cat: c.cat
-    }));
+    // Insérer le catalogue selon les métiers choisis
+    const selectedMetiers = getSelectedMetiers();
+    const catDefaut = buildCatalogueFromMetiers(selectedMetiers, email);
     await sb.from('catalogue').insert(catDefaut);
 
     loginSuccess(data);
@@ -1478,6 +1508,127 @@ let recognition = null;
 // ══ PERSISTANCE SUPABASE ══
 function saveData() { /* handled per-operation */ }
 function loadData() { /* handled per-operation */ }
+
+// ══ MÉTIERS & CATALOGUES ══
+const METIERS_CATALOGUES = {
+  plomberie: [
+    {name:"Main d'œuvre plomberie", prix:55, unit:"heure", cat:"Plomberie"},
+    {name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement"},
+    {name:"Chauffe-eau 200L", prix:420, unit:"unité", cat:"Plomberie"},
+    {name:"Remplacement robinetterie", prix:80, unit:"forfait", cat:"Plomberie"},
+    {name:"Débouchage canalisation", prix:150, unit:"forfait", cat:"Plomberie"},
+    {name:"Pose radiateur", prix:120, unit:"unité", cat:"Plomberie"},
+  ],
+  electricite: [
+    {name:"Main d'œuvre électricité", prix:65, unit:"heure", cat:"Électricité"},
+    {name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement"},
+    {name:"Tableau électrique", prix:380, unit:"unité", cat:"Électricité"},
+    {name:"Installation prise/interrupteur", prix:45, unit:"unité", cat:"Électricité"},
+    {name:"Mise aux normes électriques", prix:850, unit:"forfait", cat:"Électricité"},
+    {name:"Pose luminaire", prix:60, unit:"unité", cat:"Électricité"},
+  ],
+  menuiserie: [
+    {name:"Main d'œuvre menuiserie", prix:50, unit:"heure", cat:"Menuiserie"},
+    {name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement"},
+    {name:"Pose porte intérieure", prix:180, unit:"unité", cat:"Menuiserie"},
+    {name:"Pose fenêtre double vitrage", prix:320, unit:"unité", cat:"Menuiserie"},
+    {name:"Pose parquet", prix:45, unit:"m²", cat:"Menuiserie"},
+    {name:"Fabrication meuble sur mesure", prix:85, unit:"heure", cat:"Menuiserie"},
+  ],
+  maconnerie: [
+    {name:"Main d'œuvre maçonnerie", prix:55, unit:"heure", cat:"Maçonnerie"},
+    {name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement"},
+    {name:"Pose carrelage", prix:40, unit:"m²", cat:"Maçonnerie"},
+    {name:"Construction mur parpaing", prix:90, unit:"m²", cat:"Maçonnerie"},
+    {name:"Coulage dalle béton", prix:75, unit:"m²", cat:"Maçonnerie"},
+    {name:"Enduit façade", prix:30, unit:"m²", cat:"Maçonnerie"},
+  ],
+  peinture: [
+    {name:"Peinture murs intérieur", prix:18, unit:"m²", cat:"Peinture"},
+    {name:"Peinture façade extérieure", prix:25, unit:"m²", cat:"Peinture"},
+    {name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement"},
+    {name:"Pose papier peint", prix:22, unit:"m²", cat:"Peinture"},
+    {name:"Préparation support", prix:10, unit:"m²", cat:"Peinture"},
+    {name:"Main d'œuvre peinture", prix:40, unit:"heure", cat:"Peinture"},
+  ],
+  toiture: [
+    {name:"Main d'œuvre toiture", prix:60, unit:"heure", cat:"Toiture"},
+    {name:"Déplacement", prix:35, unit:"forfait", cat:"Déplacement"},
+    {name:"Remplacement tuiles", prix:25, unit:"m²", cat:"Toiture"},
+    {name:"Nettoyage toiture", prix:15, unit:"m²", cat:"Toiture"},
+    {name:"Pose gouttière", prix:45, unit:"ml", cat:"Toiture"},
+    {name:"Étanchéité toiture terrasse", prix:80, unit:"m²", cat:"Toiture"},
+  ],
+  chauffage: [
+    {name:"Main d'œuvre chauffage", prix:60, unit:"heure", cat:"Chauffage"},
+    {name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement"},
+    {name:"Entretien chaudière", prix:120, unit:"forfait", cat:"Chauffage"},
+    {name:"Remplacement chaudière gaz", prix:1800, unit:"forfait", cat:"Chauffage"},
+    {name:"Pose pompe à chaleur", prix:4500, unit:"forfait", cat:"Chauffage"},
+    {name:"Remplacement radiateur", prix:250, unit:"unité", cat:"Chauffage"},
+  ],
+  climatisation: [
+    {name:"Main d'œuvre clim", prix:65, unit:"heure", cat:"Climatisation"},
+    {name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement"},
+    {name:"Pose climatiseur split", prix:1200, unit:"forfait", cat:"Climatisation"},
+    {name:"Entretien climatiseur", prix:90, unit:"forfait", cat:"Climatisation"},
+    {name:"Recharge gaz climatiseur", prix:150, unit:"forfait", cat:"Climatisation"},
+  ],
+  jardinage: [
+    {name:"Tonte pelouse", prix:35, unit:"heure", cat:"Jardinage"},
+    {name:"Déplacement", prix:25, unit:"forfait", cat:"Déplacement"},
+    {name:"Taille haie/arbuste", prix:40, unit:"heure", cat:"Jardinage"},
+    {name:"Élagage arbre", prix:350, unit:"forfait", cat:"Jardinage"},
+    {name:"Création massif fleuri", prix:60, unit:"m²", cat:"Jardinage"},
+    {name:"Entretien jardin mensuel", prix:120, unit:"forfait", cat:"Jardinage"},
+  ],
+  carrelage: [
+    {name:"Pose carrelage sol", prix:40, unit:"m²", cat:"Carrelage"},
+    {name:"Pose faïence murale", prix:45, unit:"m²", cat:"Carrelage"},
+    {name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement"},
+    {name:"Dépose ancien carrelage", prix:15, unit:"m²", cat:"Carrelage"},
+    {name:"Ragréage sol", prix:12, unit:"m²", cat:"Carrelage"},
+    {name:"Main d'œuvre carrelage", prix:45, unit:"heure", cat:"Carrelage"},
+  ],
+  nettoyage: [
+    {name:"Nettoyage bureau/local", prix:30, unit:"heure", cat:"Nettoyage"},
+    {name:"Nettoyage après travaux", prix:25, unit:"heure", cat:"Nettoyage"},
+    {name:"Déplacement", prix:20, unit:"forfait", cat:"Déplacement"},
+    {name:"Nettoyage vitres", prix:8, unit:"m²", cat:"Nettoyage"},
+    {name:"Nettoyage haute pression", prix:15, unit:"m²", cat:"Nettoyage"},
+  ],
+  autre: [
+    {name:"Main d'œuvre", prix:50, unit:"heure", cat:"Général"},
+    {name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement"},
+    {name:"Fournitures", prix:0, unit:"forfait", cat:"Général"},
+    {name:"Prestation forfait", prix:150, unit:"forfait", cat:"Général"},
+  ],
+};
+
+function toggleMetier(card) {
+  card.classList.toggle('selected');
+}
+
+function getSelectedMetiers() {
+  return [...document.querySelectorAll('#metier-grid .metier-card.selected')]
+    .map(c => c.dataset.metier);
+}
+
+function buildCatalogueFromMetiers(metiers, email) {
+  const seen = new Set();
+  const result = [];
+  for (const m of metiers) {
+    const items = METIERS_CATALOGUES[m] || [];
+    for (const item of items) {
+      const key = item.name.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); result.push({user_email: email, ...item}); }
+    }
+  }
+  // Si aucun métier sélectionné → catalogue par défaut
+  if (result.length === 0) return DEFAULT_CATALOGUE.map(c => ({user_email: email, name: c.name, prix: c.prix, unit: c.unit, cat: c.cat}));
+  return result;
+}
+
 const DEFAULT_CATALOGUE = [
   {id:1, name:"Main d'œuvre", prix:55, unit:"heure", cat:"Main d'œuvre", default:true},
   {id:2, name:"Déplacement", prix:30, unit:"forfait", cat:"Déplacement", default:true},
