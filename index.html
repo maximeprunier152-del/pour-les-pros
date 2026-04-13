@@ -2056,7 +2056,10 @@ function renderDoc(d) {
       </div>
     </div>
     <div class="doc-sign-area">
-      <div class="sign-box"><div class="sign-box-label">Cachet prestataire</div></div>
+      <div class="sign-box">
+        <div class="sign-box-label">Cachet prestataire</div>
+        ${getCachet() ? `<img src="${getCachet()}" style="max-height:60px;max-width:100%;object-fit:contain;margin-top:4px" alt="Cachet">` : ''}
+      </div>
       <div class="sign-box">
         <div class="sign-box-label">Bon pour accord — Signature client</div>
         ${d.signed
