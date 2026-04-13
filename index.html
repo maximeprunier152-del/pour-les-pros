@@ -2409,7 +2409,19 @@ function exportPDF() {
     const cachetImg = getCachet();
     if (cachetImg) {
       try {
-        pdf.addImage(cachetImg, 'PNG', M+2, y+7, colW-4, 20);
+        // Calculer les dimensions pour garder le ratio
+        const tmpImg = new Image();
+        tmpImg.src = cachetImg;
+        const imgW = tmpImg.naturalWidth || 300;
+        const imgH = tmpImg.naturalHeight || 120;
+        const maxW = colW - 4;
+        const maxH = 22;
+        const ratio = Math.min(maxW / imgW, maxH / imgH);
+        const drawW = imgW * ratio;
+        const drawH = imgH * ratio;
+        const drawX = M + 2 + (maxW - drawW) / 2; // centré
+        const drawY = y + 4 + (maxH - drawH) / 2;
+        pdf.addImage(cachetImg, 'PNG', drawX, drawY, drawW, drawH);
       } catch(e) { console.error('Cachet error:', e); }
     }
     // Intégrer la signature dessinée si elle existe
@@ -3097,12 +3109,25 @@ function handleCachetUpload(input) {
   if (file.size > 2 * 1024 * 1024) { toast('⚠️', 'Image trop lourde (max 2 Mo)'); return; }
   const reader = new FileReader();
   reader.onload = e => {
-    const base64 = e.target.result;
-    // Stocker dans localStorage pour persistance
-    localStorage.setItem('cachet_' + currentUser.email, base64);
-    currentUser._cachet = base64;
-    loadCachetPreview();
-    toast('✅', 'Cachet enregistré !');
+    // Convertir en PNG via canvas pour compatibilité jsPDF (SVG, JPEG, WebP...)
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ratio = Math.min(600/img.width, 240/img.height, 1);
+      canvas.width = Math.round(img.width * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const pngBase64 = canvas.toDataURL('image/png');
+      localStorage.setItem('cachet_' + currentUser.email, pngBase64);
+      currentUser._cachet = pngBase64;
+      loadCachetPreview();
+      toast('✅', 'Cachet enregistré !');
+    };
+    img.onerror = () => toast('⚠️', 'Format image non supporté');
+    img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
