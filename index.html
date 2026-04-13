@@ -2395,6 +2395,8 @@ function exportPDF() {
     pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(170,170,170);
     pdf.text("Règlement : 30% à la commande, solde à réception. Validité : 30 jours. Garantie décennale + RC pro.", M, y);
 
+    // Stocker le PDF en mémoire pour l'envoi par email
+    devis._pdfBase64 = pdf.output('datauristring').split(',')[1];
     pdf.save(`${d.num}.pdf`);
     toast('⬇️','PDF téléchargé');
   } catch(e){ toast('⬇️','PDF généré (démo)'); }
@@ -2403,6 +2405,8 @@ function exportPDF() {
 // ══ EMAIL ══
 function openEmailModal() {
   if(!devis) return;
+  // Générer le PDF s'il n'est pas encore en mémoire
+  if (!devis._pdfBase64) exportPDF();
   document.getElementById('me-email').value=devis.emailCli||'';
   document.getElementById('me-objet').value=`Votre devis ${devis.num} — ${devis.objet}`;
   document.getElementById('me-msg').value=`Bonjour ${devis.cli},\n\nVeuillez trouver ci-joint votre devis n°${devis.num} d'un montant de ${f(devis.ttc)} € TTC.\n\nCordialement,\n${devis.ent}`;
@@ -2419,12 +2423,17 @@ async function doSendEmail() {
   btn.textContent = 'Envoi…'; btn.disabled = true;
 
   try {
-    // Générer le PDF en base64
-    let pdfBase64 = null, pdfName = null;
-    if (devis) {
+    // Utiliser le PDF déjà généré (identique à celui téléchargé)
+    let pdfBase64 = devis?._pdfBase64 || null;
+    let pdfName = devis ? devis.num + '.pdf' : null;
+    if (devis && !pdfBase64) {
+      // Fallback : regénérer si pas encore en mémoire
       try {
-        const {jsPDF} = window.jspdf;
-        const pdf = new jsPDF({unit:'mm', format:'a4'});
+        exportPDF();
+        pdfBase64 = devis._pdfBase64 || null;
+      } catch(e) { console.error('PDF fallback error:', e); }
+    }
+    if (false) { try { const {jsPDF} = window.jspdf; const pdf = new jsPDF({unit:'mm', format:'a4'});
         const W=210, M=18; let y=18;
         const ent = devis.ent || currentUser?.company || 'Votre Entreprise';
         pdf.setFont('helvetica','bold'); pdf.setFontSize(16); pdf.setTextColor(17,17,17);
@@ -2468,8 +2477,7 @@ async function doSendEmail() {
         pdf.text('Total TTC',W-M-58,y+6.2);pdf.text(f(devis.ttc)+' €',W-M-2,y+6.2,{align:'right'});
         pdfBase64 = pdf.output('datauristring').split(',')[1];
         pdfName = devis.num + '.pdf';
-      } catch(e) { console.error('PDF gen error:', e); }
-    }
+      } catch(e) { console.error('PDF gen error:', e); } }
 
     // HTML du message
     const htmlBody = `
