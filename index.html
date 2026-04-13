@@ -1750,7 +1750,6 @@ async function loadUserData() {
 
     if (devisErr) console.error('Devis error:', devisErr);
     history = (devisData || []).map(d => {
-      // Essayer de parser les lignes depuis description JSON
       let lignes = null;
       let desc = d.description || '';
       try {
@@ -1760,9 +1759,11 @@ async function loadUserData() {
       return {
         id: d.num, client: d.client, desc,
         ttc: d.ttc, ht: d.ht, date: d.date_devis,
+        valid: d.valid_devis || null,
+        ent: d.ent || null,
         status: d.status, email: d.email_client,
         last_relance: d.last_relance || null,
-        lignes // null si ancien devis sans lignes
+        lignes
       };
     });
 
@@ -1822,7 +1823,7 @@ async function goPage(p) {
     if(data) history = data.map(d => {
       let lignes = null; let desc = d.description || '';
       try { const p = JSON.parse(d.description); if(Array.isArray(p)){lignes=p;desc=p.map(l=>l.desc).join(', ').slice(0,40);} } catch(e){}
-      return {id:d.num,client:d.client,desc,ttc:d.ttc,ht:d.ht,date:d.date_devis,status:d.status,email:d.email_client,last_relance:d.last_relance||null,lignes};
+      return {id:d.num,client:d.client,desc,ttc:d.ttc,ht:d.ht,date:d.date_devis,valid:d.valid_devis||null,ent:d.ent||null,status:d.status,email:d.email_client,last_relance:d.last_relance||null,lignes};
     });
     renderDash();
   }
@@ -1995,7 +1996,11 @@ async function generer() {
     const {error: insertErr} = await sb.from('devis').insert([{
       user_email: currentUser.email, num, client: data.cli||'Client',
       description: lignesJSON, ttc, ht: devis.ht,
-      email_client: data.email, date_devis: now.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}), status: 'attente'
+      email_client: data.email,
+      date_devis: now.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}),
+      valid_devis: devis.valid,
+      ent: devis.ent,
+      status: 'attente'
     }]);
     if(insertErr) console.error('Devis insert error:', insertErr);
   }
