@@ -2408,11 +2408,116 @@ function openEmailModal() {
   document.getElementById('me-msg').value=`Bonjour ${devis.cli},\n\nVeuillez trouver ci-joint votre devis n°${devis.num} d'un montant de ${f(devis.ttc)} € TTC.\n\nCordialement,\n${devis.ent}`;
   document.getElementById('m-email').classList.add('open');
 }
-function doSendEmail() {
-  const h=history.find(x=>x.id===devis?.num);
-  if(h){ h.status='envoye'; if(currentUser) sb.from('devis').update({status:'envoye'}).eq('num',devis.num).eq('user_email',currentUser.email); }
-  closeModals(); toast('✉️','Devis envoyé par email !');
-  setTimeout(()=>toast('🔔','Relance programmée dans 3 jours'),2200);
+async function doSendEmail() {
+  const to = document.getElementById('me-email').value.trim();
+  const subject = document.getElementById('me-objet').value.trim();
+  const msg = document.getElementById('me-msg').value.trim();
+
+  if (!to || !subject) { toast('⚠️', 'Email et objet requis'); return; }
+
+  const btn = document.querySelector('#m-email .btn-ok');
+  btn.textContent = 'Envoi…'; btn.disabled = true;
+
+  try {
+    // Générer le PDF en base64
+    let pdfBase64 = null, pdfName = null;
+    if (devis) {
+      try {
+        const {jsPDF} = window.jspdf;
+        const pdf = new jsPDF({unit:'mm', format:'a4'});
+        const W=210, M=18; let y=18;
+        const ent = devis.ent || currentUser?.company || 'Votre Entreprise';
+        pdf.setFont('helvetica','bold'); pdf.setFontSize(16); pdf.setTextColor(17,17,17);
+        pdf.text(ent, M, y); y+=6;
+        pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(85,85,85);
+        const infoLine = [currentUser?.address||'', currentUser?.siret?'SIRET '+currentUser.siret:'', currentUser?.phone||''].filter(Boolean).join(' · ');
+        pdf.text(infoLine || currentUser?.email || '', M, y); y+=12;
+        pdf.setDrawColor(232,232,232); pdf.line(M,y,W-M,y); y+=8;
+        pdf.setFontSize(9); pdf.setTextColor(17,17,17);
+        pdf.setFont('helvetica','bold'); pdf.text('CLIENT',M,y); pdf.text('N° DEVIS',W-M-35,y); y+=5;
+        pdf.setFont('helvetica','normal'); pdf.text(devis.cli||'',M,y);
+        if(devis.emailCli){pdf.setFontSize(8);pdf.setTextColor(85,85,85);y+=4;pdf.text(devis.emailCli,M,y);y+=1;}
+        pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.setTextColor(17,17,17);
+        pdf.text(devis.num,W-M,y-4,{align:'right'}); y+=5;
+        pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(85,85,85);
+        pdf.text('Émis le '+devis.date+' · Valable jusqu\'au '+devis.valid,M,y); y+=10;
+        pdf.setDrawColor(17,17,17);pdf.setLineWidth(.5);pdf.line(M,y,W-M,y);y+=8;
+        pdf.setFillColor(17,17,17);pdf.rect(M,y,W-2*M,7,'F');
+        pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8);
+        pdf.text('DÉSIGNATION',M+2,y+4.8);pdf.text('QTÉ',M+98,y+4.8,{align:'center'});
+        pdf.text('PU HT',M+120,y+4.8,{align:'center'});pdf.text('TOTAL HT',W-M-2,y+4.8,{align:'right'});
+        y+=7;
+        const PAGE_H=297,MARGIN_BOTTOM=20,ROW_H=8;
+        devis.lignes.forEach((l,i)=>{
+          if(y+ROW_H>PAGE_H-MARGIN_BOTTOM){pdf.addPage();y=18;}
+          if(i%2===1){pdf.setFillColor(248,248,248);pdf.rect(M,y,W-2*M,ROW_H,'F');}
+          pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(17,17,17);
+          pdf.text((l.desc||'').slice(0,50),M+2,y+5.5);
+          pdf.text(String(l.qty),M+98,y+5.5,{align:'center'});
+          pdf.text(f(l.pu)+' €',M+120,y+5.5,{align:'center'});
+          pdf.setFont('helvetica','bold');pdf.text(f(l.total)+' €',W-M-2,y+5.5,{align:'right'});
+          y+=ROW_H;
+        });
+        y+=6;
+        if(y+30>PAGE_H-MARGIN_BOTTOM){pdf.addPage();y=18;}
+        pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(85,85,85);
+        pdf.text('Total HT :',W-M-38,y);pdf.text(f(devis.ht)+' €',W-M,y,{align:'right'});y+=6;
+        pdf.text('TVA (10%) :',W-M-38,y);pdf.text(f(devis.tva)+' €',W-M,y,{align:'right'});y+=4;
+        pdf.setFillColor(17,17,17);pdf.rect(W-M-60,y,60,9,'F');
+        pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(10);
+        pdf.text('Total TTC',W-M-58,y+6.2);pdf.text(f(devis.ttc)+' €',W-M-2,y+6.2,{align:'right'});
+        pdfBase64 = pdf.output('datauristring').split(',')[1];
+        pdfName = devis.num + '.pdf';
+      } catch(e) { console.error('PDF gen error:', e); }
+    }
+
+    // HTML du message
+    const htmlBody = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+        <div style="background:#111;padding:20px;border-radius:8px 8px 0 0">
+          <h2 style="color:#fff;margin:0;font-size:18px">${devis?.ent || currentUser?.company || 'Devis'}</h2>
+        </div>
+        <div style="padding:24px;border:1px solid #e8e8e8;border-top:none;border-radius:0 0 8px 8px">
+          <p style="color:#333;line-height:1.6">${msg.split('\n').join('<br>')}</p>
+          ${pdfBase64 ? '<p style="color:#666;font-size:13px">📎 Le devis est joint en pièce jointe.</p>' : ''}
+          <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e8e8e8;font-size:12px;color:#999">
+            Envoyé via DevisIA
+          </div>
+        </div>
+      </div>`;
+
+    const resp = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to,
+        subject,
+        html: htmlBody,
+        fromName: devis?.ent || currentUser?.company || 'DevisIA',
+        replyTo: currentUser?.email,
+        pdfBase64,
+        pdfName
+      })
+    });
+
+    const result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || 'Erreur envoi');
+
+    // Mettre à jour le statut
+    const h = history.find(x => x.id === devis?.num);
+    if (h) {
+      h.status = 'envoye';
+      if (currentUser) sb.from('devis').update({status:'envoye'}).eq('num',devis.num).eq('user_email',currentUser.email);
+    }
+    closeModals();
+    toast('✉️', 'Devis envoyé à ' + to + ' !');
+
+  } catch(e) {
+    console.error('Send error:', e);
+    toast('⚠️', 'Erreur : ' + e.message);
+  } finally {
+    btn.textContent = 'Envoyer'; btn.disabled = false;
+  }
 }
 
 // ══ SIGN ══
