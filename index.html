@@ -257,40 +257,40 @@ body {
 .lh.c { text-align: center; }
 
 .ligne-row {
-  display: grid; grid-template-columns: 1fr 64px 84px 80px 32px;
-  gap: 0; align-items: stretch;
+  display: flex; align-items: center;
   border: 1px solid var(--border);
   border-radius: 10px; margin-bottom: 6px;
   transition: border-color 0.15s; overflow: hidden;
+  background: var(--bg);
 }
 .num-label { display: none; }
 .ligne-row:hover { border-color: var(--border2); }
 .ligne-row > input[type=text] {
-  background: transparent; border: none; border-right: 1px solid var(--border);
-  padding: 11px 12px; margin: 0;
+  flex: 1; background: transparent; border: none;
+  border-right: 1px solid var(--border);
+  padding: 12px 14px; margin: 0;
   font-size: 13px; outline: none; font-family: 'Inter', sans-serif;
-  color: var(--text); width: 100%;
+  color: var(--text); min-width: 0;
 }
-.ligne-row > input[type=text]:focus { background: var(--bg2); }
 .ligne-row-nums {
-  display: contents;
+  display: flex; align-items: center; flex-shrink: 0;
 }
 .ligne-row-nums input[type=number] {
-  background: transparent; border: none; border-right: 1px solid var(--border);
-  padding: 11px 8px; margin: 0; width: 100%;
+  width: 62px; background: transparent; border: none;
+  border-right: 1px solid var(--border);
+  padding: 12px 8px; margin: 0;
   font-size: 13px; outline: none; font-family: 'Inter', sans-serif;
   color: var(--text); text-align: center;
 }
-.ligne-row-nums input[type=number]:focus { background: var(--bg2); }
 .li-c { text-align: center; }
-.li-r { 
+.li-r {
   display: flex; align-items: center; justify-content: flex-end;
-  padding: 0 10px; font-weight: 600; font-size: 13px; color: var(--text);
-  border-right: 1px solid var(--border);
+  width: 82px; padding: 0 12px; font-weight: 600; font-size: 13px; color: var(--text);
+  border-right: 1px solid var(--border); white-space: nowrap;
 }
 .li-del {
-  width: 32px; border: none; background: none;
-  color: var(--text3); cursor: pointer;
+  width: 36px; height: 44px; border: none; background: none;
+  color: var(--text3); cursor: pointer; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; transition: all 0.15s;
 }
@@ -610,39 +610,33 @@ body {
     padding: 0; gap: 0;
   }
   .ligne-row > input[type=text] {
-    border: none; border-bottom: 1px solid var(--border);
-    border-radius: 0; padding: 12px 14px;
+    flex: 1; border: none; border-bottom: 1px solid var(--border);
+    border-radius: 0; padding: 13px 14px;
     font-size: 15px; font-weight: 500; background: var(--bg);
   }
-  .ligne-row > input[type=text]:focus { background: var(--bg2); }
+  .ligne-row > .li-del { display: none; }
   .ligne-row-nums {
     display: flex; align-items: center;
-    background: var(--bg2); padding: 10px 14px; gap: 0;
+    background: var(--bg2); padding: 10px 14px; gap: 6px;
   }
   .ligne-row-nums .num-label {
-    display: inline; font-size: 11px; color: var(--text3);
-    margin-right: 4px; white-space: nowrap;
+    display: inline; font-size: 11px; color: var(--text3); white-space: nowrap;
   }
   .ligne-row-nums input[type=number] {
-    width: 56px; font-size: 14px; font-weight: 500;
+    width: 58px; font-size: 14px; font-weight: 500;
     background: var(--bg); border: 1px solid var(--border);
-    border-radius: 7px; padding: 6px 8px; text-align: center;
-    margin-right: 14px;
+    border-radius: 7px; padding: 7px 8px; text-align: center;
   }
   .ligne-row-nums .li-r {
     font-size: 15px; font-weight: 700; color: var(--text);
     margin-left: auto; white-space: nowrap;
-    border: none; padding: 0; background: none;
-  }
-  .ligne-row > .li-del {
-    display: none;
+    width: auto; border: none; padding: 0; background: none;
   }
   .ligne-row-nums .li-del-mob {
     display: flex; align-items: center; justify-content: center;
-    width: 28px; height: 28px; margin-left: 10px;
+    width: 30px; height: 30px; margin-left: 6px; flex-shrink: 0;
     background: #fee2e2; border: none; border-radius: 7px;
     color: var(--red); font-size: 16px; cursor: pointer;
-    flex-shrink: 0;
   }
 
   .doc-wrap { border-radius: 10px; }
