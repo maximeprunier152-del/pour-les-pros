@@ -1977,7 +1977,16 @@ async function generer() {
 
   renderDoc(devis);
   btn.disabled=false; btn.innerHTML='<span>↻</span> Regénérer';
-  const newDevis = {id:num,client:data.cli||'Client',desc:devis.objet.slice(0,40),ttc,date:now.toLocaleDateString('fr-FR'),status:'attente',email:data.email};
+  const newDevis = {
+    id:num, client:data.cli||'Client', desc:devis.objet.slice(0,40),
+    ttc, ht:devis.ht, tva:devis.tva,
+    date:now.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}),
+    valid:devis.valid,
+    status:'attente', email:data.email,
+    lignes:devis.lignes,
+    ent:devis.ent,
+    objet:devis.objet
+  };
   history.unshift(newDevis);
   // Sauvegarder dans Supabase avec await
   if(currentUser) {
@@ -1986,7 +1995,7 @@ async function generer() {
     const {error: insertErr} = await sb.from('devis').insert([{
       user_email: currentUser.email, num, client: data.cli||'Client',
       description: lignesJSON, ttc, ht: devis.ht,
-      email_client: data.email, date_devis: now.toLocaleDateString('fr-FR'), status: 'attente'
+      email_client: data.email, date_devis: now.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}), status: 'attente'
     }]);
     if(insertErr) console.error('Devis insert error:', insertErr);
   }
@@ -2173,23 +2182,27 @@ function exportPDFFromHistory(id) {
     const W=210, M=18;
     let y=18;
 
-    const ent = currentUser?.company || currentUser?.name || 'Votre Entreprise';
+    const ent = d.ent || currentUser?.company || currentUser?.name || 'Votre Entreprise';
     const ht  = parseFloat(d.ht) || Math.round((parseFloat(d.ttc)||0) / 1.1 * 100) / 100;
-    const tva = Math.round(((parseFloat(d.ttc)||0) - ht) * 100) / 100;
+    const tva = parseFloat(d.tva) || Math.round(((parseFloat(d.ttc)||0) - ht) * 100) / 100;
     const ttc = parseFloat(d.ttc) || 0;
 
-    // Valable dans 30 jours
-    let validStr = '';
+    // Date et validité — utiliser celles stockées si dispo
+    let validStr = d.valid || '';
+    // Si la date est en format JJ/MM/AAAA → convertir en long
     try {
-      const parts = (d.date||'').split('/');
-      if (parts.length === 3) {
+      if ((d.date||'').includes('/') && (d.date||'').split('/').length === 3) {
+        const parts = d.date.split('/');
         const base = new Date(parts[2], parts[1]-1, parts[0]);
-        // Formater la date en format long
         dateStr = base.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
-        base.setDate(base.getDate()+30);
-        validStr = base.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+        if (!validStr) {
+          base.setDate(base.getDate()+30);
+          validStr = base.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+        }
+      } else {
+        dateStr = d.date || '';
       }
-    } catch(e){}
+    } catch(e){ dateStr = d.date || ''; }
 
     // ── EN-TÊTE ──
     pdf.setFont('helvetica','bold'); pdf.setFontSize(16); pdf.setTextColor(17,17,17);
