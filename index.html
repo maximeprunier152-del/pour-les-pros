@@ -2428,19 +2428,8 @@ function exportPDF() {
     const cachetImg = getCachet();
     if (cachetImg) {
       try {
-        // Calculer les dimensions pour garder le ratio
-        const tmpImg = new Image();
-        tmpImg.src = cachetImg;
-        const imgW = tmpImg.naturalWidth || 300;
-        const imgH = tmpImg.naturalHeight || 120;
-        const maxW = colW - 4;
-        const maxH = 22;
-        const ratio = Math.min(maxW / imgW, maxH / imgH);
-        const drawW = imgW * ratio;
-        const drawH = imgH * ratio;
-        const drawX = M + 2 + (maxW - drawW) / 2; // centré
-        const drawY = y + 4 + (maxH - drawH) / 2;
-        pdf.addImage(cachetImg, 'PNG', drawX, drawY, drawW, drawH);
+        // Dimensions fixes : remplir la zone cachet (colW x 26mm)
+        pdf.addImage(cachetImg, 'PNG', M+2, y+6, colW-4, 20);
       } catch(e) { console.error('Cachet error:', e); }
     }
     // Intégrer la signature dessinée si elle existe
