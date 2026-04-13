@@ -2768,7 +2768,7 @@ async function saveSettings() {
   const phone = document.getElementById('set-phone').value.trim();
   const email_pro = document.getElementById('set-email-pro').value.trim();
 
-  if (!company) { toast('⚠️', 'Le nom de l'entreprise est requis'); return; }
+  if (!company) { toast('⚠️', "Le nom de l'entreprise est requis"); return; }
 
   const btn = document.querySelector('#page-settings .btn-primary');
   btn.textContent = 'Enregistrement…'; btn.disabled = true;
