@@ -916,6 +916,9 @@ body {
   <button class="nav-item" id="ni-cat" onclick="goPage('cat')">
     <span class="ni">📦</span> Catalogue
   </button>
+  <button class="nav-item" id="ni-settings" onclick="goPage('settings')">
+    <span class="ni">⚙️</span> Réglages
+  </button>
 
   <div class="user-badge" id="userBadge" style="display:none">
     <div class="user-avatar" id="userAvatar">?</div>
@@ -1107,6 +1110,37 @@ body {
   </div>
   <div class="content">
     <div class="cat-grid" id="cat-grid"></div>
+  </div>
+</div>
+
+<!-- ══ PAGE RÉGLAGES ══ -->
+<div class="page" id="page-settings">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Réglages</div>
+      <div class="topbar-sub">Informations de votre entreprise</div>
+    </div>
+    <button class="btn-primary" onclick="saveSettings()">💾 Enregistrer</button>
+  </div>
+  <div class="content">
+    <div class="card">
+      <div class="card-title">Votre entreprise</div>
+      <div class="row2">
+        <div class="field"><label>Nom de l'entreprise</label><input type="text" id="set-company" placeholder="Plomberie Durand"></div>
+        <div class="field"><label>Prénom / Nom</label><input type="text" id="set-name" placeholder="Jean Durand"></div>
+      </div>
+      <div class="field"><label>Adresse</label><input type="text" id="set-address" placeholder="12 rue des Lilas, 69000 Lyon"></div>
+      <div class="row2">
+        <div class="field"><label>SIRET</label><input type="text" id="set-siret" placeholder="123 456 789 00012"></div>
+        <div class="field"><label>Téléphone</label><input type="tel" id="set-phone" placeholder="06 12 34 56 78"></div>
+      </div>
+      <div class="field"><label>Email professionnel</label><input type="email" id="set-email-pro" placeholder="contact@entreprise.fr"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Aperçu en-tête PDF</div>
+      <div id="settings-preview" style="font-size:13px;line-height:1.8;color:var(--text2);padding:4px 0"></div>
+    </div>
   </div>
 </div>
 
@@ -1543,7 +1577,8 @@ async function goPage(p) {
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
-  document.getElementById('ni-'+p).classList.add('active');
+  const niEl = document.getElementById('ni-'+p);
+  if(niEl) niEl.classList.add('active');
   // Update bottom nav
   document.querySelectorAll('.bottom-nav-item').forEach(x=>x.classList.remove('active'));
   const bn = document.getElementById('bn-'+p);
@@ -1556,6 +1591,7 @@ async function goPage(p) {
   }
   if(p==='cat') { renderCat(); renderCatChips(); }
   if(p==='devis') { renderCatChips(); }
+  if(p==='settings') { openSettings(); }
   if(p==='dash' && currentUser) {
     const { data } = await sb.from('devis').select('*').eq('user_email',currentUser.email).order('created_at',{ascending:false});
     if(data) history = data.map(d => {
@@ -2688,6 +2724,77 @@ async function changeStatus(id, status) {
   toast(status === 'signe' ? '✅' : '🔄', status === 'signe' ? 'Devis marqué signé !' : 'Statut mis à jour');
 }
 
+// ══ RÉGLAGES ══
+function openSettings() {
+  if (!currentUser) return;
+  document.getElementById('set-company').value = currentUser.company || '';
+  document.getElementById('set-name').value = currentUser.name || '';
+  document.getElementById('set-address').value = currentUser.address || '';
+  document.getElementById('set-siret').value = currentUser.siret || '';
+  document.getElementById('set-phone').value = currentUser.phone || '';
+  document.getElementById('set-email-pro').value = currentUser.email_pro || currentUser.email || '';
+  updateSettingsPreview();
+}
+
+function updateSettingsPreview() {
+  const company = document.getElementById('set-company')?.value || '';
+  const address = document.getElementById('set-address')?.value || '';
+  const siret = document.getElementById('set-siret')?.value || '';
+  const phone = document.getElementById('set-phone')?.value || '';
+  const emailPro = document.getElementById('set-email-pro')?.value || '';
+  const infoLine = [address, siret ? 'SIRET ' + siret : '', phone].filter(Boolean).join(' · ');
+  const preview = document.getElementById('settings-preview');
+  if (preview) {
+    preview.innerHTML = `
+      <div style="font-weight:700;font-size:16px;margin-bottom:2px">${company || 'Nom entreprise'}</div>
+      <div style="color:var(--text3)">${infoLine || emailPro || 'Adresse · SIRET · Téléphone'}</div>`;
+  }
+}
+
+// Mettre à jour l'aperçu en temps réel
+document.addEventListener('DOMContentLoaded', () => {
+  ['set-company','set-address','set-siret','set-phone','set-email-pro'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', updateSettingsPreview);
+  });
+});
+
+async function saveSettings() {
+  if (!currentUser) return;
+  const company = document.getElementById('set-company').value.trim();
+  const name = document.getElementById('set-name').value.trim();
+  const address = document.getElementById('set-address').value.trim();
+  const siret = document.getElementById('set-siret').value.trim();
+  const phone = document.getElementById('set-phone').value.trim();
+  const email_pro = document.getElementById('set-email-pro').value.trim();
+
+  if (!company) { toast('⚠️', 'Le nom de l'entreprise est requis'); return; }
+
+  const btn = document.querySelector('#page-settings .btn-primary');
+  btn.textContent = 'Enregistrement…'; btn.disabled = true;
+
+  const { error } = await sb.from('users').update({ company, name, address, siret, phone })
+    .eq('email', currentUser.email);
+
+  if (error) {
+    toast('⚠️', 'Erreur lors de la sauvegarde');
+  } else {
+    // Mettre à jour currentUser
+    currentUser = { ...currentUser, company, name, address, siret, phone };
+    // Mettre à jour la sidebar
+    const uName = document.getElementById('userName');
+    if (uName) uName.textContent = company || name;
+    // Mettre à jour les champs entreprise dans le formulaire devis
+    ['t-ent','v-ent','f-ent'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = company;
+    });
+    toast('✅', 'Réglages enregistrés !');
+  }
+
+  btn.textContent = '💾 Enregistrer'; btn.disabled = false;
+}
+
 // ══ UTILS ══
 function closeModals(){document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('open'));}
 function toast(icon,txt){
@@ -2725,6 +2832,11 @@ document.addEventListener('DOMContentLoaded', () => {
   <button class="bottom-nav-item" id="bn-cat" onclick="goPage('cat')">
     <span class="bni">📦</span>
     <span>Catalogue</span>
+    <div class="bni-dot"></div>
+  </button>
+  <button class="bottom-nav-item" id="bn-settings" onclick="goPage('settings')">
+    <span class="bni">⚙️</span>
+    <span>Réglages</span>
     <div class="bni-dot"></div>
   </button>
 </nav>
