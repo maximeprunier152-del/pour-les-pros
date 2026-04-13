@@ -425,13 +425,33 @@ body {
 .doc-sign-area { display: flex; gap: 16px; margin-bottom: 24px; }
 .sign-box {
   flex: 1; border: 1px solid var(--border);
-  border-radius: 8px; padding: 14px; min-height: 72px;
+  border-radius: 8px; padding: 14px; min-height: 120px;
 }
-.sign-box-label { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+.sign-box-label { font-size: 11px; color: var(--text3); margin-bottom: 8px; }
 .sign-result { display: none; }
 .sign-result.show { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 0; }
 .sign-name { font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 16px; color: var(--green); font-style: italic; }
 .sign-date { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.sign-canvas-wrap { position: relative; }
+#signCanvas {
+  width: 100%; height: 90px; border-radius: 6px;
+  background: var(--bg2); border: 1.5px dashed var(--border2);
+  cursor: crosshair; display: block; touch-action: none;
+}
+#signCanvas.signed { border-color: var(--green); background: #f0fdf4; }
+.sign-canvas-actions {
+  display: flex; gap: 6px; margin-top: 6px; justify-content: flex-end;
+}
+.sign-canvas-actions button {
+  font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  font-family: 'Inter', sans-serif; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text2); transition: all .15s;
+}
+.sign-canvas-actions button:hover { background: var(--bg2); }
+.sign-canvas-actions .btn-valider {
+  background: var(--green); color: #fff; border-color: var(--green);
+}
+.sign-hint { font-size: 11px; color: var(--text3); text-align: center; margin-top: 4px; }
 
 .doc-footer-txt { font-size: 11px; color: var(--text3); border-top: 1px solid var(--border); padding-top: 14px; line-height: 1.8; }
 
@@ -1746,15 +1766,103 @@ function renderDoc(d) {
       <div class="sign-box"><div class="sign-box-label">Cachet prestataire</div></div>
       <div class="sign-box">
         <div class="sign-box-label">Bon pour accord — Signature client</div>
-        <div class="sign-result ${d.signed?'show':''}" id="sign-cli">
-          ${d.signed?`<div class="sign-name">${d.cli}</div><div class="sign-date">Signé le ${d.date}</div>`:''}
-        </div>
+        ${d.signed
+          ? `<div class="sign-result show" id="sign-cli">
+               <div class="sign-name">${d.cli}</div>
+               <div class="sign-date">Signé le ${d.date}</div>
+             </div>`
+          : `<div class="sign-canvas-wrap">
+               <canvas id="signCanvas" width="600" height="120"></canvas>
+               <div class="sign-hint">✍️ Signez ici avec le doigt ou la souris</div>
+               <div class="sign-canvas-actions">
+                 <button onclick="clearSignCanvas()">Effacer</button>
+                 <button class="btn-valider" onclick="validerSignature()">✅ Valider</button>
+               </div>
+             </div>`
+        }
       </div>
     </div>
     <div class="doc-footer-txt">Règlement : 30% à la commande, solde à réception. Validité : 30 jours. Garantie décennale + RC pro.</div>`;
 
   document.getElementById('docWrap').classList.add('show');
   document.getElementById('docWrap').scrollIntoView({behavior:'smooth',block:'start'});
+  // Init canvas signature après render
+  requestAnimationFrame(() => initSignCanvas());
+}
+
+function initSignCanvas() {
+  const canvas = document.getElementById('signCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let drawing = false;
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const src = e.touches ? e.touches[0] : e;
+    return {
+      x: (src.clientX - rect.left) * scaleX,
+      y: (src.clientY - rect.top) * scaleY
+    };
+  }
+
+  function start(e) { e.preventDefault(); drawing = true; const p=getPos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }
+  function draw(e)  { e.preventDefault(); if(!drawing) return; const p=getPos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); canvas.classList.add('signed'); }
+  function stop(e)  { e.preventDefault(); drawing = false; }
+
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stop);
+  canvas.addEventListener('mouseleave', stop);
+  canvas.addEventListener('touchstart', start, {passive:false});
+  canvas.addEventListener('touchmove', draw, {passive:false});
+  canvas.addEventListener('touchend', stop, {passive:false});
+}
+
+function clearSignCanvas() {
+  const canvas = document.getElementById('signCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  canvas.classList.remove('signed');
+}
+
+function validerSignature() {
+  const canvas = document.getElementById('signCanvas');
+  if (!canvas) return;
+  // Vérifier que qqch a été dessiné
+  const ctx = canvas.getContext('2d');
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  const hasDrawing = data.some(v => v !== 0);
+  if (!hasDrawing) { toast('✍️', 'Veuillez signer avant de valider'); return; }
+
+  // Sauvegarder l'image de la signature
+  const signImg = canvas.toDataURL('image/png');
+  if (devis) devis.signatureImg = signImg;
+
+  // Mettre à jour le statut
+  if (devis) {
+    devis.signed = true;
+    const h = history.find(x => x.id === devis.num);
+    if (h) { h.status = 'signe'; if(currentUser) sb.from('devis').update({status:'signe'}).eq('num',devis.num).eq('user_email',currentUser.email); }
+  }
+
+  // Remplacer le canvas par la signature validée
+  const wrap = canvas.closest('.sign-box');
+  if (wrap) {
+    wrap.innerHTML = `
+      <div class="sign-box-label">Bon pour accord — Signature client</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0">
+        <img src="${signImg}" style="max-height:70px;max-width:100%;filter:invert(0)" alt="Signature">
+        <div style="font-size:11px;color:var(--green);font-weight:600">✅ Signé — ${new Date().toLocaleDateString('fr-FR')}</div>
+      </div>`;
+  }
+  toast('✅', 'Devis signé !');
 }
 
 // ══ PDF ══
