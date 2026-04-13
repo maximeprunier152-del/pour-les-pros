@@ -918,9 +918,7 @@ body {
       <div class="topbar-title">Nouveau devis</div>
       <div class="topbar-sub">Décrivez votre prestation, l'IA fait le reste</div>
     </div>
-    <button class="btn-primary" id="genBtn" onclick="generer()">
-      <span>⚡</span> Générer le devis
-    </button>
+
   </div>
 
   <div class="content">
@@ -998,6 +996,10 @@ body {
         <button class="btn-add-ligne" onclick="addL()">+ Ajouter une ligne</button>
       </div>
     </div>
+
+    <button class="btn-primary" id="genBtn" onclick="generer()" style="width:100%;padding:14px;font-size:15px;border-radius:12px;justify-content:center;margin-top:8px;">
+      <span>⚡</span> Générer le devis
+    </button>
 
     <!-- AI STATUS -->
     <div class="ai-row" id="aiRow">
