@@ -3834,9 +3834,6 @@ async function signerEtFacturer(num, signatureImg) {
         })
       });
 
-      await sb.from('devis').update({status:'envoye'}).eq('num', num).eq('user_email', currentUser.email);
-      h.status = 'envoye';
-      renderDash();
       toast('✉️', 'Facture envoyée à ' + h.email + ' !');
     } catch(e) {
       console.error('Envoi facture error:', e);
