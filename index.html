@@ -1310,7 +1310,7 @@ body {
       <button class="btn-cancel" onclick="closeModals()">Fermer</button>
       <button class="btn-ok" onclick="exportPDFFromHistory(window._detailId)" style="background:var(--text)">⬇️ PDF devis</button>
       <button class="btn-ok" onclick="closeModals();changeStatus(window._detailId,'signe')" id="detail-btn-sign" style="background:var(--green)">✅ Marquer signé</button>
-      <button class="btn-ok" onclick="genererFacture(window._detailId)" id="detail-btn-facture" style="background:var(--blue);display:none">🧾 Générer facture</button>
+      <button class="btn-ok" onclick="exportFacturePDF(history.find(x=>x.id===window._detailId))" id="detail-btn-facture" style="background:var(--blue);display:none">🧾 Télécharger facture</button>
     </div>
   </div>
 </div>
@@ -2163,7 +2163,7 @@ function clearSignCanvas() {
   canvas.classList.remove('signed');
 }
 
-function validerSignature() {
+async function validerSignature() {
   const canvas = document.getElementById('signCanvas');
   if (!canvas) return;
   // Vérifier que qqch a été dessiné
@@ -2180,7 +2180,7 @@ function validerSignature() {
   if (devis) {
     devis.signed = true;
     const h = history.find(x => x.id === devis.num);
-    if (h) { h.status = 'signe'; if(currentUser) sb.from('devis').update({status:'signe'}).eq('num',devis.num).eq('user_email',currentUser.email); }
+    await signerEtFacturer(devis.num, devis.signatureImg);
   }
 
   // Remplacer le canvas par la signature validée
@@ -2617,14 +2617,13 @@ function openSignModal() {
   document.getElementById('ms-email').value=devis.emailCli||'';
   document.getElementById('m-sign').classList.add('open');
 }
-function doSign() {
+async function doSign() {
   if(!devis) return; closeModals();
   devis.signed=true;
   const sc=document.getElementById('sign-cli');
   if(sc){sc.innerHTML=`<div class="sign-name">${devis.cli}</div><div class="sign-date">Signé le ${devis.date}</div>`;sc.classList.add('show');}
   const h=history.find(x=>x.id===devis.num);
-  if(h){ h.status='signe'; if(currentUser) sb.from('devis').update({status:'signe'}).eq('num',devis.num).eq('user_email',currentUser.email); }
-  toast('✍️',`Signé par ${devis.cli}`);
+  await signerEtFacturer(devis.num, devis.signatureImg);
 }
 
 // ══ DASHBOARD ══
@@ -2670,7 +2669,7 @@ function renderDash() {
     }).join('')
     :'<div style="font-size:13px;color:var(--text3);padding:12px 0">Aucune relance nécessaire.</div>';
 
-  const SL={'envoye':'Envoyé','ouvert':'Ouvert','signe':'Signé','attente':'En attente','relance':'À relancer'};
+  const SL={'envoye':'Envoyé','ouvert':'Ouvert','signe':'Facturé ✅','attente':'En attente','relance':'À relancer'};
   const SC={'envoye':'b-envoye','ouvert':'b-ouvert','signe':'b-signe','attente':'b-attente','relance':'b-relance'};
   document.getElementById('devis-tbody').innerHTML=history.map(d=>`<tr style="cursor:pointer" onclick="openDevisDetail('${d.id}')" title="Cliquer pour consulter">
     <td style="font-weight:500;color:var(--text2)">${d.id}</td>
@@ -3053,7 +3052,7 @@ function openDevisDetail(id) {
   if (!d) return;
   window._detailId = id;
 
-  const SL = {'envoye':'Envoyé','ouvert':'Ouvert','signe':'Signé','attente':'En attente','relance':'À relancer'};
+  const SL = {'envoye':'Envoyé','ouvert':'Ouvert','signe':'Facturé ✅','attente':'En attente','relance':'À relancer'};
   const SC = {'envoye':'b-envoye','ouvert':'b-ouvert','signe':'b-signe','attente':'b-attente','relance':'b-relance'};
 
   document.getElementById('detail-title').textContent = `Devis ${d.id}`;
@@ -3129,12 +3128,17 @@ function openDevisDetail(id) {
 async function changeStatus(id, status) {
   const d = history.find(x => x.id === id);
   if (!d) return;
+  // Si marqué signé → générer facture automatiquement
+  if (status === 'signe') {
+    await signerEtFacturer(id, null);
+    return;
+  }
   d.status = status;
   if (currentUser) {
     await sb.from('devis').update({ status }).eq('num', id).eq('user_email', currentUser.email);
   }
   renderDash();
-  toast(status === 'signe' ? '✅' : '🔄', status === 'signe' ? 'Devis marqué signé !' : 'Statut mis à jour');
+  toast('🔄', 'Statut mis à jour');
 }
 
 // ══ RÉGLAGES ══
@@ -3758,6 +3762,33 @@ function exportComptaCSV() {
   a.click(); URL.revokeObjectURL(url);
   closeModals();
   toast('📊', `CSV exporté (${devisList.length} devis)`);
+}
+
+// ══ AUTO-FACTURATION À LA SIGNATURE ══
+async function signerEtFacturer(num, signatureImg) {
+  const h = history.find(x => x.id === num);
+  if (!h) return;
+
+  // Générer numéro de facture automatiquement
+  const year = new Date().getFullYear();
+  const existing = history.filter(d => d.num_facture && d.num_facture.startsWith('FAC-' + year));
+  const nums = existing.map(d => parseInt((d.num_facture||'').split('-')[2]||0)).filter(n => !isNaN(n));
+  const next = nums.length ? Math.max(...nums) + 1 : 1;
+  const numFac = 'FAC-' + year + '-' + String(next).padStart(3, '0');
+
+  h.status = 'signe';
+  h.num_facture = numFac;
+  if (signatureImg) h.signatureImg = signatureImg;
+
+  if (currentUser) {
+    await sb.from('devis').update({
+      status: 'signe',
+      num_facture: numFac
+    }).eq('num', num).eq('user_email', currentUser.email);
+  }
+
+  renderDash();
+  toast('🧾', 'Signé ! Facture ' + numFac + ' générée automatiquement');
 }
 
 // ══ UTILS ══
