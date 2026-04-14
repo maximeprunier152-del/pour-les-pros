@@ -3262,9 +3262,17 @@ function handleCachetUpload(input) {
       currentUser._cachet = pngBase64;
       currentUser.cachet = pngBase64;
       // Sauvegarder dans Supabase pour accès multi-appareils
-      sb.from('users').update({cachet: pngBase64}).eq('email', currentUser.email);
+      // Sauvegarder dans Supabase
+      sb.from('users').update({cachet: pngBase64}).eq('email', currentUser.email)
+        .then(({error}) => {
+          if (error) {
+            console.error('Erreur sauvegarde cachet Supabase:', error);
+            toast('⚠️', 'Cachet sauvegardé localement seulement');
+          } else {
+            toast('✅', 'Cachet enregistré sur tous vos appareils !');
+          }
+        });
       loadCachetPreview();
-      toast('✅', 'Cachet enregistré sur tous vos appareils !');
     };
 
     if (isSVG) {
