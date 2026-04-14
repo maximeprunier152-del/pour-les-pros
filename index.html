@@ -3317,6 +3317,10 @@ function removeCachet() {
 
 function getCachet() {
   if (!currentUser) return null;
+  // Synchroniser _cachet depuis cachet si nécessaire
+  if (!currentUser._cachet && currentUser.cachet) {
+    currentUser._cachet = currentUser.cachet;
+  }
   return currentUser._cachet || currentUser.cachet || localStorage.getItem('cachet_' + currentUser.email) || null;
 }
 
