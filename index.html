@@ -3322,12 +3322,26 @@ function getCachet() {
 
 // Précharger le cachet comme Image pour garantir que jsPDF peut l'utiliser
 function preloadCachet() {
-  return new Promise((resolve) => {
-    const src = getCachet();
+  return new Promise(async (resolve) => {
+    let src = getCachet();
+
+    // Si pas en local, essayer de charger depuis Supabase
+    if (!src && currentUser) {
+      try {
+        const { data } = await sb.from('users').select('cachet').eq('email', currentUser.email).single();
+        if (data && data.cachet) {
+          src = data.cachet;
+          currentUser.cachet = src;
+          currentUser._cachet = src;
+          localStorage.setItem('cachet_' + currentUser.email, src);
+        }
+      } catch(e) {}
+    }
+
     if (!src) return resolve(null);
+
     const img = new Image();
     img.onload = () => {
-      // Redessiner sur canvas pour obtenir un PNG propre
       const canvas = document.createElement('canvas');
       canvas.width = img.naturalWidth || 600;
       canvas.height = img.naturalHeight || 200;
@@ -3337,7 +3351,7 @@ function preloadCachet() {
       ctx.drawImage(img, 0, 0);
       resolve(canvas.toDataURL('image/png'));
     };
-    img.onerror = () => resolve(src); // fallback: utiliser tel quel
+    img.onerror = () => resolve(src);
     img.src = src;
   });
 }
