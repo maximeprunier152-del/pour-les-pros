@@ -3417,6 +3417,18 @@ async function genererFacture(id) {
 }
 
 async function exportFacturePDF(d) {
+  try {
+    const base64 = await genererFacturePDFBase64(d);
+    if (!base64) return;
+    // Télécharger
+    const link = document.createElement('a');
+    link.href = 'data:application/pdf;base64,' + base64;
+    link.download = (d.num_facture||'facture') + '.pdf';
+    link.click();
+    return;
+  } catch(e) { console.error(e); }
+}
+async function exportFacturePDF_OLD(d) {
   const cachetDataUrl = await preloadCachet();
   try {
     const {jsPDF} = window.jspdf;
@@ -3788,7 +3800,134 @@ async function signerEtFacturer(num, signatureImg) {
   }
 
   renderDash();
-  toast('🧾', 'Signé ! Facture ' + numFac + ' générée automatiquement');
+  closeModals();
+  toast('🧾', 'Facture ' + numFac + ' générée !');
+
+  // Envoyer la facture par email si le client a un email
+  if (h.email) {
+    try {
+      // Générer le PDF facture en base64
+      const pdfBase64 = await genererFacturePDFBase64(h);
+      if (!pdfBase64) return;
+
+      const ent = h.ent || currentUser?.company || 'Votre prestataire';
+      const msg = 'Bonjour ' + (h.client||'') + ',\n\nVeuillez trouver ci-joint votre facture n°' + numFac + " d'un montant de " + f(h.ttc) + ' € TTC.\n\nCordialement,\n' + ent;
+
+      const htmlBody = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">'
+        + '<div style="background:#111;padding:20px;border-radius:8px 8px 0 0"><h2 style="color:#fff;margin:0;font-size:18px">' + ent + '</h2></div>'
+        + '<div style="padding:24px;border:1px solid #e8e8e8;border-top:none;border-radius:0 0 8px 8px">'
+        + '<p style="color:#333;line-height:1.6">' + msg.split('\n').join('<br>') + '</p>'
+        + '<p style="color:#666;font-size:13px">📎 Votre facture est jointe en pièce jointe.</p>'
+        + '</div></div>';
+
+      await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          to: h.email,
+          subject: 'Votre facture ' + numFac + ' — ' + ent,
+          html: htmlBody,
+          fromName: ent,
+          replyTo: currentUser?.email,
+          pdfBase64,
+          pdfName: numFac + '.pdf'
+        })
+      });
+
+      await sb.from('devis').update({status:'envoye'}).eq('num', num).eq('user_email', currentUser.email);
+      h.status = 'envoye';
+      renderDash();
+      toast('✉️', 'Facture envoyée à ' + h.email + ' !');
+    } catch(e) {
+      console.error('Envoi facture error:', e);
+      toast('⚠️', 'Facture générée mais envoi email échoué');
+    }
+  }
+}
+
+// Générer facture en base64 pour envoi email
+async function genererFacturePDFBase64(h) {
+  const cachetDataUrl = await preloadCachet();
+  try {
+    const {jsPDF} = window.jspdf;
+    const pdf = new jsPDF({unit:'mm', format:'a4'});
+    const W=210, M=18; let y=18;
+    const ent = h.ent || currentUser?.company || 'Votre Entreprise';
+    const ht  = parseFloat(h.ht) || Math.round((parseFloat(h.ttc)||0)/1.1*100)/100;
+    const tva = parseFloat(h.tva) || Math.round(((parseFloat(h.ttc)||0)-ht)*100)/100;
+    const ttc = parseFloat(h.ttc) || 0;
+    const numFac = h.num_facture;
+    const dateFacture = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+
+    // EN-TÊTE
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(16); pdf.setTextColor(17,17,17);
+    pdf.text(ent, M, y); y+=6;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(85,85,85);
+    const infoLine = [currentUser?.address||'', currentUser?.siret?'SIRET '+currentUser.siret:'', currentUser?.phone||''].filter(Boolean).join(' · ');
+    pdf.text(infoLine || currentUser?.email || '', M, y); y+=12;
+    pdf.setDrawColor(232,232,232); pdf.line(M,y,W-M,y); y+=8;
+
+    // CLIENT + N° FACTURE
+    pdf.setFontSize(9); pdf.setTextColor(17,17,17); pdf.setFont('helvetica','bold');
+    pdf.text('CLIENT', M, y); pdf.text('N° FACTURE', W-M-38, y); y+=5;
+    pdf.setFont('helvetica','normal');
+    pdf.text(h.client||'', M, y);
+    if (h.email) { pdf.setFontSize(8); pdf.setTextColor(85,85,85); y+=4; pdf.text(h.email, M, y); y+=1; }
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.setTextColor(17,17,17);
+    pdf.text(numFac, W-M, y-4, {align:'right'}); y+=5;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(85,85,85);
+    pdf.text('Date : ' + dateFacture, M, y); y+=10;
+    pdf.setDrawColor(17,17,17); pdf.setLineWidth(.5); pdf.line(M,y,W-M,y); y+=8;
+
+    // TABLEAU PRESTATIONS
+    pdf.setFillColor(17,17,17); pdf.rect(M,y,W-2*M,7,'F');
+    pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(8);
+    pdf.text('DÉSIGNATION',M+2,y+4.8);
+    pdf.text('QTÉ',M+98,y+4.8,{align:'center'});
+    pdf.text('PU HT',M+122,y+4.8,{align:'center'});
+    pdf.text('TOTAL HT',W-M-2,y+4.8,{align:'right'});
+    y+=7;
+
+    const lignes = (h.lignes && h.lignes.length) ? h.lignes : [{desc:h.desc||'Prestation',qty:1,pu:ht,total:ht}];
+    lignes.forEach((l,i) => {
+      if(i%2===1){pdf.setFillColor(248,248,248);pdf.rect(M,y,W-2*M,8,'F');}
+      pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(17,17,17);
+      pdf.text((l.desc||'').slice(0,50),M+2,y+5.5);
+      pdf.text(String(l.qty||1),M+98,y+5.5,{align:'center'});
+      pdf.text(f(l.pu||0)+' €',M+122,y+5.5,{align:'center'});
+      pdf.setFont('helvetica','bold');
+      pdf.text(f(l.total||0)+' €',W-M-2,y+5.5,{align:'right'});
+      y+=8;
+    });
+    y+=6;
+
+    // TOTAUX
+    pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(85,85,85);
+    pdf.text('Total HT :',W-M-38,y);pdf.text(f(ht)+' €',W-M,y,{align:'right'});y+=6;
+    pdf.text('TVA (10%) :',W-M-38,y);pdf.text(f(tva)+' €',W-M,y,{align:'right'});y+=4;
+    pdf.setFillColor(17,17,17);pdf.rect(W-M-60,y,60,9,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(10);
+    pdf.text('Total TTC',W-M-58,y+6.2);
+    pdf.text(f(ttc)+' €',W-M-2,y+6.2,{align:'right'});
+    y+=18;
+
+    // CACHET
+    if(y+28>277){pdf.addPage();y=18;}
+    pdf.setDrawColor(200,200,200);pdf.setLineWidth(.3);
+    const colWF=(W-2*M)/2-4;
+    pdf.rect(M,y,colWF,28);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(150,150,150);
+    pdf.text('Cachet prestataire',M+2,y+4);
+    if(cachetDataUrl){try{pdf.addImage(cachetDataUrl,'PNG',M+2,y+6,colWF-4,18);}catch(e){}}
+
+    // PIED DE PAGE
+    y+=32;
+    pdf.setDrawColor(220,220,220);pdf.line(M,y,W-M,y);y+=4;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(170,170,170);
+    pdf.text("Règlement à 30 jours. Pénalités de retard : 3x le taux légal. Pas d'escompte pour paiement anticipé.",M,y);
+
+    return pdf.output('datauristring').split(',')[1];
+  } catch(e) { console.error('Facture PDF error:', e); return null; }
 }
 
 // ══ UTILS ══
