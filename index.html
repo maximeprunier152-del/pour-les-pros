@@ -2004,7 +2004,7 @@ async function generer() {
     valid:valid.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}),
     signed:false};
 
-  renderDoc(devis);
+  await renderDoc(devis);
   btn.disabled=false; btn.innerHTML='<span>↻</span> Regénérer';
   const newDevis = {
     id:num, client:data.cli||'Client', desc:devis.objet.slice(0,40),
@@ -2059,7 +2059,18 @@ function fallback(desc) {
 }
 
 // ══ RENDER DOC ══
-function renderDoc(d) {
+async function renderDoc(d) {
+  // Charger le cachet depuis Supabase si pas encore en mémoire
+  if (!getCachet() && currentUser) {
+    try {
+      const { data } = await sb.from('users').select('cachet').eq('email', currentUser.email).single();
+      if (data && data.cachet) {
+        currentUser.cachet = data.cachet;
+        currentUser._cachet = data.cachet;
+        localStorage.setItem('cachet_' + currentUser.email, data.cachet);
+      }
+    } catch(e) {}
+  }
   const slug=d.ent.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
   const rows=d.lignes.map(l=>`<tr>
     <td><div class="td-main">${l.desc}</div>${l.sous?`<div class="td-sub">${l.sous}</div>`:''}</td>
