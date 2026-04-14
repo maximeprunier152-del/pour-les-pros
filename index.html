@@ -1567,15 +1567,22 @@ async function loginSuccess(user) {
   if(uName) uName.textContent = user.company || user.name;
   if(uEmail) uEmail.textContent = user.email;
   await loadUserData();
-  // Sauvegarder le cachet uploadé à l'inscription si présent
+  // Cachet : priorité Supabase, fallback localStorage
   if (window._pendingCachet) {
+    // Cachet uploadé à l'inscription → sauvegarder dans Supabase
     localStorage.setItem('cachet_' + user.email, window._pendingCachet);
     user._cachet = window._pendingCachet;
+    user.cachet = window._pendingCachet;
+    sb.from('users').update({cachet: window._pendingCachet}).eq('email', user.email);
     window._pendingCachet = null;
+  } else if (user.cachet) {
+    // Cachet depuis Supabase → mettre aussi en localStorage pour cache
+    user._cachet = user.cachet;
+    localStorage.setItem('cachet_' + user.email, user.cachet);
   } else {
-    // Charger le cachet depuis localStorage
+    // Fallback localStorage
     const cachet = localStorage.getItem('cachet_' + user.email);
-    if (cachet) user._cachet = cachet;
+    if (cachet) { user._cachet = cachet; user.cachet = cachet; }
   }
 }
 
@@ -3242,8 +3249,11 @@ function handleCachetUpload(input) {
     const saveCachet = (pngBase64) => {
       localStorage.setItem('cachet_' + currentUser.email, pngBase64);
       currentUser._cachet = pngBase64;
+      currentUser.cachet = pngBase64;
+      // Sauvegarder dans Supabase pour accès multi-appareils
+      sb.from('users').update({cachet: pngBase64}).eq('email', currentUser.email);
       loadCachetPreview();
-      toast('✅', 'Cachet enregistré !');
+      toast('✅', 'Cachet enregistré sur tous vos appareils !');
     };
 
     if (isSVG) {
@@ -3279,7 +3289,7 @@ function handleCachetUpload(input) {
 
 function loadCachetPreview() {
   if (!currentUser) return;
-  const cachet = localStorage.getItem('cachet_' + currentUser.email);
+  const cachet = getCachet();
   currentUser._cachet = cachet || null;
   const wrap = document.getElementById('cachet-preview-wrap');
   const actions = document.getElementById('cachet-actions');
@@ -3300,13 +3310,14 @@ function removeCachet() {
   if (!currentUser) return;
   localStorage.removeItem('cachet_' + currentUser.email);
   currentUser._cachet = null;
+  sb.from('users').update({cachet: null}).eq('email', currentUser.email);
   loadCachetPreview();
   toast('🗑️', 'Cachet supprimé');
 }
 
 function getCachet() {
   if (!currentUser) return null;
-  return currentUser._cachet || localStorage.getItem('cachet_' + currentUser.email) || null;
+  return currentUser._cachet || currentUser.cachet || localStorage.getItem('cachet_' + currentUser.email) || null;
 }
 
 // Précharger le cachet comme Image pour garantir que jsPDF peut l'utiliser
