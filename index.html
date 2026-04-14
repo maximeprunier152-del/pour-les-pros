@@ -1308,8 +1308,9 @@ body {
     <div id="detail-body"></div>
     <div class="modal-actions" style="margin-top:16px">
       <button class="btn-cancel" onclick="closeModals()">Fermer</button>
-      <button class="btn-ok" onclick="exportPDFFromHistory(window._detailId)" style="background:var(--text)">⬇️ Télécharger PDF</button>
+      <button class="btn-ok" onclick="exportPDFFromHistory(window._detailId)" style="background:var(--text)">⬇️ PDF devis</button>
       <button class="btn-ok" onclick="closeModals();changeStatus(window._detailId,'signe')" id="detail-btn-sign" style="background:var(--green)">✅ Marquer signé</button>
+      <button class="btn-ok" onclick="genererFacture(window._detailId)" id="detail-btn-facture" style="background:var(--blue);display:none">🧾 Générer facture</button>
     </div>
   </div>
 </div>
@@ -1318,7 +1319,7 @@ body {
 <div class="overlay" id="m-compta">
   <div class="modal" style="width:480px;max-width:95vw">
     <div class="modal-title">📥 Export comptable</div>
-    <div class="modal-sub">Téléchargez tous vos devis signés en un seul PDF à envoyer à votre comptable.</div>
+    <div class="modal-sub">Téléchargez toutes vos factures en un seul PDF à envoyer à votre comptable.</div>
 
     <div style="margin-bottom:16px">
       <div class="section-label" style="margin-bottom:8px">Période</div>
@@ -1843,7 +1844,7 @@ async function goPage(p) {
     if(data) history = data.map(d => {
       let lignes = null; let desc = d.description || '';
       try { const p = JSON.parse(d.description); if(Array.isArray(p)){lignes=p;desc=p.map(l=>l.desc).join(', ').slice(0,40);} } catch(e){}
-      return {id:d.num,client:d.client,desc,ttc:d.ttc,ht:d.ht,date:d.date_devis,valid:d.valid_devis||null,ent:d.ent||null,status:d.status,email:d.email_client,last_relance:d.last_relance||null,lignes};
+      return {id:d.num,client:d.client,desc,ttc:d.ttc,ht:d.ht,date:d.date_devis,valid:d.valid_devis||null,ent:d.ent||null,status:d.status,email:d.email_client,last_relance:d.last_relance||null,lignes,num_facture:d.num_facture||null};
     });
     renderDash();
   }
@@ -3058,8 +3059,7 @@ function openDevisDetail(id) {
   document.getElementById('detail-title').textContent = `Devis ${d.id}`;
 
   // Cacher le bouton "Marquer signé" si déjà signé
-  const btnSign = document.getElementById('detail-btn-sign');
-  btnSign.style.display = d.status === 'signe' ? 'none' : 'flex';
+  // bouton sign/facture géré dans le bloc suivant
 
   document.getElementById('detail-body').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
@@ -3112,6 +3112,17 @@ function openDevisDetail(id) {
     </div>
   `;
 
+  // Afficher bouton facture seulement si signé
+  const d2 = history.find(x => x.id === id);
+  const btnFac = document.getElementById('detail-btn-facture');
+  const btnSign = document.getElementById('detail-btn-sign');
+  if (d2 && d2.status === 'signe') {
+    if (btnFac) btnFac.style.display = '';
+    if (btnSign) btnSign.style.display = 'none';
+  } else {
+    if (btnFac) btnFac.style.display = 'none';
+    if (btnSign) btnSign.style.display = '';
+  }
   document.getElementById('m-detail').classList.add('open');
 }
 
@@ -3375,6 +3386,131 @@ async function saveSettings() {
   btn.textContent = '💾 Enregistrer'; btn.disabled = false;
 }
 
+// ══ FACTURES ══
+function getNumFacture() {
+  const year = new Date().getFullYear();
+  const existing = history.filter(d => d.num_facture && d.num_facture.startsWith('FAC-' + year));
+  const nums = existing.map(d => parseInt((d.num_facture||'').split('-')[2]||0)).filter(n => !isNaN(n));
+  const next = nums.length ? Math.max(...nums) + 1 : 1;
+  return 'FAC-' + year + '-' + String(next).padStart(3, '0');
+}
+
+async function genererFacture(id) {
+  const d = history.find(x => x.id === id);
+  if (!d) return;
+  if (d.status !== 'signe') { toast('⚠️', 'Le devis doit être signé pour générer une facture'); return; }
+
+  // Générer numéro facture si pas encore fait
+  if (!d.num_facture) {
+    d.num_facture = getNumFacture();
+    if (currentUser) {
+      await sb.from('devis').update({num_facture: d.num_facture}).eq('num', id).eq('user_email', currentUser.email);
+    }
+  }
+
+  await exportFacturePDF(d);
+  toast('🧾', 'Facture ' + d.num_facture + ' générée !');
+}
+
+async function exportFacturePDF(d) {
+  const cachetDataUrl = await preloadCachet();
+  try {
+    const {jsPDF} = window.jspdf;
+    const pdf = new jsPDF({unit:'mm', format:'a4'});
+    const W=210, M=18;
+    let y=18;
+    const ent = d.ent || currentUser?.company || 'Votre Entreprise';
+    const ht  = parseFloat(d.ht) || Math.round((parseFloat(d.ttc)||0)/1.1*100)/100;
+    const tva = parseFloat(d.tva) || Math.round(((parseFloat(d.ttc)||0)-ht)*100)/100;
+    const ttc = parseFloat(d.ttc) || 0;
+    const numFac = d.num_facture || getNumFacture();
+    const dateFacture = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+
+    // ── EN-TÊTE ──
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(16); pdf.setTextColor(17,17,17);
+    pdf.text(ent, M, y); y+=6;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(85,85,85);
+    const infoLine = [currentUser?.address||'', currentUser?.siret?'SIRET '+currentUser.siret:'', currentUser?.phone||''].filter(Boolean).join(' · ');
+    pdf.text(infoLine || currentUser?.email || '', M, y); y+=12;
+    pdf.setDrawColor(232,232,232); pdf.line(M,y,W-M,y); y+=8;
+
+    // ── FACTURE badge ──
+    pdf.setFillColor(17,17,17); pdf.rect(W-M-45, y-6, 45, 10, 'F');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.setTextColor(255,255,255);
+    pdf.text('FACTURE', W-M-2, y+1, {align:'right'});
+
+    // ── CLIENT + N° ──
+    pdf.setFontSize(9); pdf.setTextColor(17,17,17);
+    pdf.setFont('helvetica','bold');
+    pdf.text('CLIENT', M, y); pdf.text('N° FACTURE', W-M-35, y); y+=5;
+    pdf.setFont('helvetica','normal');
+    pdf.text(d.client||'', M, y);
+    if (d.email) { pdf.setFontSize(8); pdf.setTextColor(85,85,85); y+=4; pdf.text(d.email, M, y); y+=1; }
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.setTextColor(17,17,17);
+    pdf.text(numFac, W-M, y-4, {align:'right'}); y+=5;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(85,85,85);
+    pdf.text('Émis le ' + dateFacture + ' · Ref. devis : ' + d.id, M, y); y+=10;
+    pdf.setDrawColor(17,17,17); pdf.setLineWidth(.5); pdf.line(M,y,W-M,y); y+=8;
+
+    // ── TABLEAU ──
+    pdf.setFillColor(17,17,17); pdf.rect(M,y,W-2*M,7,'F');
+    pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(8);
+    pdf.text('DÉSIGNATION',M+2,y+4.8);
+    pdf.text('QTÉ',M+98,y+4.8,{align:'center'});
+    pdf.text('PU HT',M+122,y+4.8,{align:'center'});
+    pdf.text('TOTAL HT',W-M-2,y+4.8,{align:'right'});
+    y+=7;
+
+    const lignes = (d.lignes && d.lignes.length) ? d.lignes : [{desc:d.desc||'Prestation',qty:1,pu:ht,total:ht}];
+    lignes.forEach((l,i) => {
+      if(i%2===1){pdf.setFillColor(248,248,248);pdf.rect(M,y,W-2*M,8,'F');}
+      pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(17,17,17);
+      pdf.text((l.desc||'').slice(0,50),M+2,y+5.5);
+      pdf.text(String(l.qty||1),M+98,y+5.5,{align:'center'});
+      pdf.text(f(l.pu||0)+' €',M+122,y+5.5,{align:'center'});
+      pdf.setFont('helvetica','bold');
+      pdf.text(f(l.total||0)+' €',W-M-2,y+5.5,{align:'right'});
+      y+=8;
+    });
+    y+=6;
+
+    // ── TOTAUX ──
+    pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(85,85,85);
+    pdf.text('Total HT :',W-M-38,y);pdf.text(f(ht)+' €',W-M,y,{align:'right'});y+=6;
+    pdf.text('TVA (10%) :',W-M-38,y);pdf.text(f(tva)+' €',W-M,y,{align:'right'});y+=4;
+    pdf.setFillColor(17,17,17);pdf.rect(W-M-60,y,60,9,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(10);
+    pdf.text('Total TTC',W-M-58,y+6.2);
+    pdf.text(f(ttc)+' €',W-M-2,y+6.2,{align:'right'});
+    y+=18;
+
+    // ── CACHET ──
+    const signBoxH = 28;
+    if(y+signBoxH>277){pdf.addPage();y=18;}
+    pdf.setDrawColor(200,200,200);pdf.setLineWidth(.3);
+    const colWF=(W-2*M)/2-4;
+    pdf.rect(M,y,colWF,signBoxH);
+    pdf.rect(M+colWF+8,y,colWF,signBoxH);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(150,150,150);
+    pdf.text('Cachet prestataire',M+2,y+4);
+    pdf.text('Acquitté — Bon pour paiement',M+colWF+10,y+4);
+    if(cachetDataUrl){try{pdf.addImage(cachetDataUrl,'PNG',M+2,y+6,colWF-4,18);}catch(e){}}
+    // Tampon PAYÉ
+    pdf.setFillColor(22,163,74);pdf.rect(M+colWF+10,y+8,colWF-12,12,'F');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(14);pdf.setTextColor(255,255,255);
+    pdf.text('PAYÉ',M+colWF+10+(colWF-12)/2,y+17,{align:'center'});
+    y+=signBoxH+6;
+
+    // ── MENTIONS LÉGALES ──
+    pdf.setDrawColor(220,220,220);pdf.line(M,y,W-M,y);y+=4;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(170,170,170);
+    pdf.text("Règlement : 30 jours à réception de facture. Pénalités de retard : 3x taux légal. Pas d'escompte pour paiement anticipé.",M,y);y+=4;
+    pdf.text('TVA non applicable selon article 293B du CGI ou TVA applicable selon régime réel.',M,y);
+
+    pdf.save(numFac+'.pdf');
+  } catch(e) { console.error(e); toast('⚠️','Erreur génération facture'); }
+}
+
 // ══ EXPORT COMPTABLE ══
 let currentPeriode = 'all';
 
@@ -3388,7 +3524,7 @@ function setPeriode(p, btn) {
 function getDevisForPeriode(periode) {
   const now = new Date();
   return history.filter(d => {
-    if (d.status !== 'signe') return false;
+    if (d.status !== 'signe' || !d.num_facture) return false;
     if (periode === 'all') return true;
     // Parser la date du devis
     let devisDate;
@@ -3469,7 +3605,7 @@ function exportComptaPDF() {
     pdf.setFont('helvetica','bold'); pdf.setFontSize(20); pdf.setTextColor(17,17,17);
     pdf.text(ent, M, y); y+=8;
     pdf.setFont('helvetica','normal'); pdf.setFontSize(10); pdf.setTextColor(85,85,85);
-    pdf.text('Export comptable — ' + periodeLabel, M, y); y+=5;
+    pdf.text('Export factures — ' + periodeLabel, M, y); y+=5;
     pdf.text('Généré le ' + new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}), M, y); y+=12;
 
     // Ligne séparatrice
