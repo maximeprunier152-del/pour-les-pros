@@ -25,6 +25,17 @@
   --orange: #ea580c;
   --yellow: #ca8a04;
 }
+body.dark-mode {
+  --bg: #111111;
+  --bg2: #1a1a1a;
+  --bg3: #222222;
+  --border: #333333;
+  --border2: #444444;
+  --text: #f0f0f0;
+  --text2: #aaaaaa;
+  --text3: #666666;
+  --accent: #f0f0f0;
+}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -939,6 +950,9 @@ body {
   <button class="nav-item" id="ni-settings" onclick="goPage('settings')">
     <span class="ni">⚙️</span> Réglages
   </button>
+  <button class="nav-item" id="ni-darkmode" onclick="toggleDarkMode()" style="margin-top:auto">
+    <span class="ni" id="dm-icon">🌙</span> <span id="dm-label">Mode sombre</span>
+  </button>
 
   <div class="user-badge" id="userBadge" style="display:none">
     <div class="user-avatar" id="userAvatar">?</div>
@@ -1016,6 +1030,7 @@ body {
         <div class="row2">
           <div class="field"><label>Objet du devis</label><input type="text" id="f-obj" placeholder="Remplacement chauffe-eau 200L"></div>
           <div class="field"><label>Email client</label><input type="email" id="f-email" placeholder="client@email.fr"></div>
+        <div class="field"><label>Téléphone client <span style="font-weight:400;color:var(--text3)">(optionnel)</span></label><input type="tel" id="f-tel-cli" placeholder="06 12 34 56 78"></div>
         </div>
       </div>
 
@@ -1109,7 +1124,28 @@ body {
     <div id="relances-list" style="margin-bottom:28px"></div>
 
     <div class="section-header">
-      <div class="section-title">Tous les devis</div>
+      <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="card-title" style="margin-bottom:0">📈 CA des 6 derniers mois</div>
+      </div>
+      <canvas id="ca-chart" width="500" height="160" style="width:100%;height:160px"></canvas>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+        <div class="section-title" style="margin-bottom:0">Tous les devis</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="dash-search" placeholder="🔍 Rechercher..." oninput="filterDash()"
+            style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);width:150px">
+          <select id="dash-filter-status" onchange="filterDash()"
+            style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:var(--bg);color:var(--text)">
+            <option value="">Tous</option>
+            <option value="attente">En attente</option>
+            <option value="envoye">Envoyé</option>
+            <option value="signe">Facturé</option>
+            <option value="relance">À relancer</option>
+          </select>
+        </div>
+      </div>
     </div>
     <table class="devis-table">
       <thead>
@@ -1160,6 +1196,29 @@ body {
         <div class="field"><label>Téléphone</label><input type="tel" id="set-phone" placeholder="06 12 34 56 78"></div>
       </div>
       <div class="field"><label>Email professionnel</label><input type="email" id="set-email-pro" placeholder="contact@entreprise.fr"></div>
+      <div class="row2">
+        <div class="field">
+          <label>Taux TVA par défaut</label>
+          <select id="set-tva" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px">
+            <option value="0">0% (Auto-entrepreneur)</option>
+            <option value="10" selected>10%</option>
+            <option value="20">20%</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Acompte demandé</label>
+          <select id="set-acompte" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px">
+            <option value="0">Aucun</option>
+            <option value="30" selected>30%</option>
+            <option value="40">40%</option>
+            <option value="50">50%</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Conditions de paiement</label>
+        <input type="text" id="set-conditions" placeholder="Ex : 30% à la commande, solde à réception">
+      </div>
     </div>
 
     <div class="card">
@@ -1309,8 +1368,10 @@ body {
     <div class="modal-actions" style="margin-top:16px">
       <button class="btn-cancel" onclick="closeModals()">Fermer</button>
       <button class="btn-ok" onclick="exportPDFFromHistory(window._detailId)" style="background:var(--text)">⬇️ PDF devis</button>
+      <button class="btn-ok" onclick="dupliquerDevis(window._detailId);closeModals()" style="background:var(--blue)">📋 Dupliquer</button>
       <button class="btn-ok" onclick="closeModals();changeStatus(window._detailId,'signe')" id="detail-btn-sign" style="background:var(--green)">✅ Marquer signé</button>
       <button class="btn-ok" onclick="exportFacturePDF(history.find(x=>x.id===window._detailId))" id="detail-btn-facture" style="background:var(--blue);display:none">🧾 Télécharger facture</button>
+      <button class="btn-ok" onclick="partagerLienSignature(window._detailId)" id="detail-btn-share" style="background:var(--orange)">🔗 Lien signature</button>
     </div>
   </div>
 </div>
@@ -1596,6 +1657,85 @@ function doLogout() {
   renderDash(); renderCat();
   switchAuth('login');
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  initDarkMode();
+  if (checkSignatureParam()) return; // Page signature externe
+});
+
+function checkSignatureParam() {
+  const params = new URLSearchParams(window.location.search);
+  const signParam = params.get('sign');
+  if (!signParam) return false;
+  try {
+    const data = JSON.parse(decodeURIComponent(atob(signParam)));
+    // Afficher une page de signature simplifiée
+    document.body.innerHTML = `
+      <div style="font-family:'Inter',sans-serif;max-width:600px;margin:40px auto;padding:20px">
+        <div style="text-align:center;margin-bottom:24px">
+          <div style="font-size:24px;font-weight:800">${data.ent || 'Votre prestataire'}</div>
+          <div style="color:#666;margin-top:4px">Devis ${data.id} — ${data.date}</div>
+        </div>
+        <div style="border:1px solid #e8e8e8;border-radius:12px;padding:20px;margin-bottom:20px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:16px">
+            <div><div style="font-size:11px;color:#999;text-transform:uppercase">Client</div><div style="font-weight:600">${data.client}</div></div>
+            <div style="text-align:right"><div style="font-size:11px;color:#999;text-transform:uppercase">Total TTC</div><div style="font-weight:800;font-size:20px">${data.ttc ? data.ttc.toLocaleString('fr-FR',{minimumFractionDigits:2}) : '—'} €</div></div>
+          </div>
+          ${data.lignes ? data.lignes.map(l => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #f0f0f0"><span>${l.desc}</span><span style="font-weight:600">${(l.total||0).toFixed(2)} €</span></div>`).join('') : ''}
+        </div>
+        <div style="border:1px solid #e8e8e8;border-radius:12px;padding:20px;margin-bottom:20px">
+          <div style="font-size:13px;color:#666;margin-bottom:12px">✍️ Signez ci-dessous pour accepter ce devis</div>
+          <canvas id="sign-canvas-ext" width="560" height="150" style="width:100%;height:150px;border:1.5px dashed #ccc;border-radius:8px;cursor:crosshair;touch-action:none;background:#fff"></canvas>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button onclick="clearExtSign()" style="flex:1;padding:10px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer">Effacer</button>
+            <button onclick="validerExtSign('${data.id}','${data.ent}','${data.email||''}')" style="flex:2;padding:10px;border:none;border-radius:8px;background:#111;color:#fff;font-weight:600;cursor:pointer">✅ Valider ma signature</button>
+          </div>
+        </div>
+        <div id="sign-ext-result" style="display:none;text-align:center;padding:20px;background:#f0fdf4;border-radius:12px;color:#16a34a;font-weight:600">
+          ✅ Merci ! Votre signature a bien été enregistrée.
+        </div>
+      </div>`;
+
+    // Init canvas signature externe
+    const canvas = document.getElementById('sign-canvas-ext');
+    if (canvas) {
+      let drawing = false;
+      const ctx = canvas.getContext('2d');
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const src = e.touches ? e.touches[0] : e;
+        return { x: (src.clientX - rect.left) * scaleX, y: (src.clientY - rect.top) * scaleY };
+      };
+      canvas.addEventListener('mousedown', e => { drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+      canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+      canvas.addEventListener('mouseup', () => drawing = false);
+      canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+      canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+      canvas.addEventListener('touchend', () => drawing = false);
+    }
+    return true;
+  } catch(e) { console.error('Sign param error:', e); return false; }
+}
+
+window.clearExtSign = function() {
+  const c = document.getElementById('sign-canvas-ext');
+  if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height);
+};
+
+window.validerExtSign = async function(devisId, ent, clientEmail) {
+  const c = document.getElementById('sign-canvas-ext');
+  if (!c) return;
+  const signImg = c.toDataURL('image/png');
+  const btn = document.querySelector('[onclick*="validerExtSign"]');
+  if (btn) { btn.textContent = 'Envoi...'; btn.disabled = true; }
+  // Afficher confirmation
+  const result = document.getElementById('sign-ext-result');
+  if (result) result.style.display = 'block';
+  if (btn) btn.style.display = 'none';
+};
 
 function checkSession() {
   // Toujours demander le mot de passe à chaque visite
@@ -1995,11 +2135,17 @@ async function generer() {
   const now=new Date();
   const valid=new Date(now.getTime()+30*24*3600*1000);
   const num='DEV-'+now.getFullYear()+'-'+String(Math.floor(Math.random()*900)+100);
-  const ht=lignes.reduce((s,l)=>s+l.total,0),tva=ht*.1,ttc=ht+tva;
+  const tvaRate = parseFloat(currentUser?.tva_rate || '10') / 100;
+  const ht=lignes.reduce((s,l)=>s+l.total,0),tva=Math.round(ht*tvaRate*100)/100,ttc=Math.round((ht+tva)*100)/100;
+  const tvaLabel = 'TVA (' + (currentUser?.tva_rate || '10') + '%) :';
+  const acompteRate = parseInt(currentUser?.acompte || '30');
+  const acompteMontant = acompteRate > 0 ? Math.round(ttc * acompteRate / 100 * 100) / 100 : 0;
+  const conditionsPaiement = currentUser?.conditions || '30% à la commande, solde à réception. Validité : 30 jours. Garantie décennale + RC pro.';
 
   devis={num,ent:data.ent||'Votre Entreprise',cli:data.cli||'Client',
-    emailCli:data.email,objet:data.objet||lignes[0]?.desc||'Prestation',
-    lignes,ht,tva,ttc,
+    emailCli:data.email, telCli:data.tel||'',
+    objet:data.objet||lignes[0]?.desc||'Prestation',
+    lignes,ht,tva,ttc,tvaRate,tvaLabel,acompteRate,acompteMontant,conditionsPaiement,
     date:now.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}),
     valid:valid.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}),
     signed:false};
@@ -2037,7 +2183,7 @@ async function generer() {
 function getData() {
   if(mode==='texte') return {ent:document.getElementById('t-ent').value,cli:document.getElementById('t-cli').value,email:document.getElementById('t-email').value,desc:document.getElementById('t-desc').value,objet:document.getElementById('t-desc').value.split('.')[0]?.trim().slice(0,60)||'Prestation'};
   if(mode==='voix') return {ent:document.getElementById('v-ent').value,cli:document.getElementById('v-cli').value,email:document.getElementById('v-email').value,desc:document.getElementById('vtrans').textContent,objet:document.getElementById('vtrans').textContent.split('.')[0]?.trim().slice(0,60)||'Prestation'};
-  return {ent:document.getElementById('f-ent').value,cli:document.getElementById('f-cli').value,email:document.getElementById('f-email').value,desc:'',objet:document.getElementById('f-obj').value||'Devis'};
+  return {ent:document.getElementById('f-ent').value,cli:document.getElementById('f-cli').value,email:document.getElementById('f-email').value,tel:document.getElementById('f-tel-cli')?.value||'',desc:'',objet:document.getElementById('f-obj').value||'Devis'};
 }
 
 async function callClaude(description) {
@@ -2094,7 +2240,7 @@ async function renderDoc(d) {
     <div class="doc-divider"></div>
     <div class="doc-parties">
       <div class="doc-party"><div class="doc-party-label">Prestataire</div><div class="doc-party-name">${d.ent}</div><div class="doc-party-info">${currentUser?.email||''}</div></div>
-      <div class="doc-party"><div class="doc-party-label">Client</div><div class="doc-party-name">${d.cli}</div><div class="doc-party-info">${d.emailCli||''}</div></div>
+      <div class="doc-party"><div class="doc-party-label">Client</div><div class="doc-party-name">${d.cli}</div><div class="doc-party-info">${d.emailCli||''}${d.telCli ? '<br>📞 '+d.telCli : ''}</div></div>
     </div>
     <div class="doc-objet"><div class="doc-objet-label">Objet</div><div class="doc-objet-text">${d.objet}</div></div>
     <table class="doc-table">
@@ -2104,8 +2250,9 @@ async function renderDoc(d) {
     <div class="doc-totaux">
       <div class="tot-box">
         <div class="tot-line"><span>Total HT</span><span>${f(d.ht)} €</span></div>
-        <div class="tot-line"><span>TVA (10%)</span><span>${f(d.tva)} €</span></div>
+        <div class="tot-line"><span>${d.tvaLabel||'TVA (10%)'}</span><span>${f(d.tva)} €</span></div>
         <div class="tot-final"><span class="tot-final-label">Total TTC</span><span class="tot-final-val">${f(d.ttc)} €</span></div>
+        ${d.acompteRate > 0 ? `<div class="tot-line" style="color:var(--blue);font-weight:600;margin-top:4px"><span>Acompte ${d.acompteRate}%</span><span>${f(d.acompteMontant)} €</span></div>` : ''}
       </div>
     </div>
     <div class="doc-sign-area">
@@ -2326,12 +2473,18 @@ async function exportPDFFromHistory(id) {
     // ── TOTAUX ──
     pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(85,85,85);
     pdf.text('Total HT :', W-M-38, y); pdf.text(f(ht)+' €', W-M, y, {align:'right'}); y+=6;
-    pdf.text('TVA (10%) :', W-M-38, y); pdf.text(f(tva)+' €', W-M, y, {align:'right'}); y+=4;
+    pdf.text(devis.tvaLabel||'TVA (10%) :', W-M-38, y); pdf.text(f(tva)+' €', W-M, y, {align:'right'}); y+=4;
     pdf.setFillColor(17,17,17); pdf.rect(W-M-60, y, 60, 9, 'F');
     pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(10);
     pdf.text('Total TTC', W-M-58, y+6.2);
     pdf.text(f(ttc)+' €', W-M-2, y+6.2, {align:'right'});
-    y+=16;
+    y+=12;
+    if (devis.acompteRate > 0) {
+      pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(37,99,235);
+      pdf.text('Acompte ' + devis.acompteRate + '% : ' + f(devis.acompteMontant) + ' €', W-M, y, {align:'right'});
+      y+=6;
+    }
+    y+=6;
 
     // ── ZONES SIGNATURE ──
     const colWH = (W-2*M)/2 - 4;
@@ -2358,7 +2511,7 @@ async function exportPDFFromHistory(id) {
     y+=28;
     pdf.setDrawColor(220,220,220); pdf.line(M, y, W-M, y); y+=5;
     pdf.setFontSize(7); pdf.setTextColor(170,170,170);
-    pdf.text('Règlement : 30% à la commande, solde à réception. Validité : 30 jours. Garantie décennale + RC pro.', M, y);
+    pdf.text(devis?.conditionsPaiement || currentUser?.conditions || 'Règlement : 30% à la commande, solde à réception. Validité : 30 jours. Garantie décennale + RC pro.', M, y);
 
     pdf.save(d.id+'.pdf');
     toast('⬇️', 'PDF téléchargé');
@@ -2546,6 +2699,7 @@ async function doSendEmail() {
         pdf.setFont('helvetica','bold'); pdf.text('CLIENT',M,y); pdf.text('N° DEVIS',W-M-35,y); y+=5;
         pdf.setFont('helvetica','normal'); pdf.text(devis.cli||'',M,y);
         if(devis.emailCli){pdf.setFontSize(8);pdf.setTextColor(85,85,85);y+=4;pdf.text(devis.emailCli,M,y);y+=1;}
+    if(devis.telCli){pdf.setFontSize(8);pdf.setTextColor(85,85,85);y+=4;pdf.text('📞 '+devis.telCli,M,y);y+=1;}
         pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.setTextColor(17,17,17);
         pdf.text(devis.num,W-M,y-4,{align:'right'}); y+=5;
         pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(85,85,85);
@@ -2571,7 +2725,7 @@ async function doSendEmail() {
         if(y+30>PAGE_H-MARGIN_BOTTOM){pdf.addPage();y=18;}
         pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(85,85,85);
         pdf.text('Total HT :',W-M-38,y);pdf.text(f(devis.ht)+' €',W-M,y,{align:'right'});y+=6;
-        pdf.text('TVA (10%) :',W-M-38,y);pdf.text(f(devis.tva)+' €',W-M,y,{align:'right'});y+=4;
+        pdf.text(devis.tvaLabel||'TVA (10%) :',W-M-38,y);pdf.text(f(devis.tva)+' €',W-M,y,{align:'right'});y+=4;
         pdf.setFillColor(17,17,17);pdf.rect(W-M-60,y,60,9,'F');
         pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(10);
         pdf.text('Total TTC',W-M-58,y+6.2);pdf.text(f(devis.ttc)+' €',W-M-2,y+6.2,{align:'right'});
@@ -2658,17 +2812,34 @@ function renderDash() {
   const SEVEN_DAYS = 7 * 24 * 3600 * 1000;
   const now = Date.now();
 
-  // Afficher seulement les devis non signés ET non relancés depuis 7 jours
+  // Auto-marquer les devis "envoyés" depuis plus de 7 jours comme "À relancer"
+  history.forEach(d => {
+    if (d.status === 'envoye' && !d.last_relance) {
+      // Essayer de parser la date du devis
+      try {
+        const mois = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+        const parts = (d.date||'').split(' ');
+        const m = mois.indexOf((parts[1]||'').toLowerCase());
+        const day = parseInt(parts[0]);
+        const yr = parseInt(parts[2]);
+        if (m >= 0 && day && yr) {
+          const devisDate = new Date(yr, m, day);
+          if (now - devisDate.getTime() > SEVEN_DAYS) {
+            d.status = 'relance';
+          }
+        }
+      } catch(e) {}
+    }
+  });
+
+  // Afficher les devis à relancer
   const relances = history.filter(d => {
-    // Exclure les signés
     if (d.status === 'signe') return false;
-    // Si relancé récemment (moins de 7 jours), cacher
     if (d.last_relance) {
       const daysSince = now - new Date(d.last_relance).getTime();
       if (daysSince < SEVEN_DAYS) return false;
     }
-    // Afficher si jamais relancé ET statut non signé
-    return true;
+    return d.status === 'relance' || d.status === 'envoye';
   });
 
   document.getElementById('relances-list').innerHTML=relances.length
@@ -2689,7 +2860,7 @@ function renderDash() {
 
   const SL={'envoye':'Envoyé','ouvert':'Ouvert','signe':'Facturé ✅','attente':'En attente','relance':'À relancer'};
   const SC={'envoye':'b-envoye','ouvert':'b-ouvert','signe':'b-signe','attente':'b-attente','relance':'b-relance'};
-  document.getElementById('devis-tbody').innerHTML=history.map(d=>`<tr style="cursor:pointer" onclick="openDevisDetail('${d.id}')" title="Cliquer pour consulter">
+  document.getElementById('devis-tbody').innerHTML=history.map(d=>`<tr style="cursor:pointer" data-status="${d.status}" onclick="openDevisDetail('${d.id}')" title="Cliquer pour consulter">
     <td style="font-weight:500;color:var(--text2)">${d.id}</td>
     <td style="font-weight:500">${d.client}</td>
     <td style="color:var(--text2)">${d.desc}</td>
@@ -2697,6 +2868,8 @@ function renderDash() {
     <td style="color:var(--text3)">${d.date}</td>
     <td><span class="badge ${SC[d.status]}">${SL[d.status]}</span></td>
   </tr>`).join('');
+  // Graphique CA
+  setTimeout(renderCAChart, 50);
 }
 async function doRelance(id){
   const d=history.find(x=>x.id===id);
@@ -3168,6 +3341,9 @@ function openSettings() {
   document.getElementById('set-siret').value = currentUser.siret || '';
   document.getElementById('set-phone').value = currentUser.phone || '';
   document.getElementById('set-email-pro').value = currentUser.email_pro || currentUser.email || '';
+  document.getElementById('set-tva').value = currentUser.tva_rate || '10';
+  document.getElementById('set-acompte').value = currentUser.acompte || '30';
+  document.getElementById('set-conditions').value = currentUser.conditions || '30% à la commande, solde à réception. Validité : 30 jours. Garantie décennale + RC pro.';
   updateSettingsPreview();
   // Charger le cachet si existant
   loadCachetPreview();
@@ -3416,14 +3592,18 @@ async function saveSettings() {
   const btn = document.querySelector('#page-settings .btn-primary');
   btn.textContent = 'Enregistrement…'; btn.disabled = true;
 
-  const { error } = await sb.from('users').update({ company, name, address, siret, phone })
+  const tva_rate = document.getElementById('set-tva').value;
+  const acompte = document.getElementById('set-acompte').value;
+  const conditions = document.getElementById('set-conditions').value.trim();
+
+  const { error } = await sb.from('users').update({ company, name, address, siret, phone, tva_rate, acompte, conditions })
     .eq('email', currentUser.email);
 
   if (error) {
     toast('⚠️', 'Erreur lors de la sauvegarde');
   } else {
     // Mettre à jour currentUser
-    currentUser = { ...currentUser, company, name, address, siret, phone };
+    currentUser = { ...currentUser, company, name, address, siret, phone, tva_rate, acompte, conditions };
     // Mettre à jour la sidebar
     const uName = document.getElementById('userName');
     if (uName) uName.textContent = company || name;
@@ -3938,6 +4118,169 @@ async function genererFacturePDFBase64(h) {
   } catch(e) { console.error('Facture PDF error:', e); return null; }
 }
 
+// ══ LIEN SIGNATURE CLIENT ══
+async function partagerLienSignature(id) {
+  const d = history.find(x => x.id === id);
+  if (!d) return;
+  // Encoder les infos du devis dans l'URL
+  const data = {
+    id: d.id,
+    client: d.client,
+    email: d.email,
+    ttc: d.ttc,
+    ht: d.ht,
+    date: d.date,
+    valid: d.valid,
+    ent: d.ent || currentUser?.company,
+    desc: d.desc,
+    lignes: d.lignes
+  };
+  const encoded = btoa(encodeURIComponent(JSON.stringify(data)));
+  const url = window.location.origin + window.location.pathname + '?sign=' + encoded;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('🔗', 'Lien copié ! Envoyez-le à votre client.');
+  } catch(e) {
+    // Fallback : afficher le lien
+    prompt('Copiez ce lien et envoyez-le à votre client :', url);
+  }
+}
+
+// ══ DUPLIQUER DEVIS ══
+function dupliquerDevis(id) {
+  const d = history.find(x => x.id === id);
+  if (!d) return;
+  // Aller sur la page nouveau devis en mode formulaire
+  goPage('devis');
+  // Préremplir le formulaire avec les infos du devis
+  setTimeout(() => {
+    // Passer en mode formulaire
+    // Passer en mode formulaire
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(b => { if (b.textContent.includes('Formulaire')) b.click(); });
+    // Remplir les champs
+    const fEnt = document.getElementById('f-ent');
+    const fCli = document.getElementById('f-cli');
+    const fObj = document.getElementById('f-obj');
+    if (fEnt) fEnt.value = d.ent || currentUser?.company || '';
+    if (fCli) fCli.value = d.client || '';
+    if (fObj) fObj.value = d.objet || '';
+    // Ajouter les lignes
+    if (d.lignes && d.lignes.length) {
+      const lignesContainer = document.getElementById('lignes');
+      if (lignesContainer) {
+        lignesContainer.innerHTML = '';
+        d.lignes.forEach(l => {
+          addLigne();
+          const rows = lignesContainer.querySelectorAll('.ligne-row');
+          const lastRow = rows[rows.length - 1];
+          if (lastRow) {
+            const inputs = lastRow.querySelectorAll('input');
+            const numInputs = lastRow.querySelectorAll('input[type=number]');
+            if (inputs[0]) inputs[0].value = l.desc || '';
+            if (numInputs[0]) numInputs[0].value = l.qty || 1;
+            if (numInputs[1]) { numInputs[1].value = l.pu || 0; numInputs[1].dispatchEvent(new Event('input')); }
+          }
+        });
+      }
+    }
+    toast('📋', 'Devis dupliqué ! Modifiez et générez.');
+  }, 300);
+}
+
+// ══ RECHERCHE/FILTRE TABLEAU DE BORD ══
+function filterDash() {
+  const search = (document.getElementById('dash-search')?.value || '').toLowerCase();
+  const status = document.getElementById('dash-filter-status')?.value || '';
+  const rows = document.querySelectorAll('#dash-table tbody tr');
+  let visible = 0;
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    const rowStatus = row.dataset.status || '';
+    const matchSearch = !search || text.includes(search);
+    const matchStatus = !status || rowStatus === status;
+    if (matchSearch && matchStatus) { row.style.display = ''; visible++; }
+    else row.style.display = 'none';
+  });
+}
+
+// ══ MODE SOMBRE ══
+function toggleDarkMode() {
+  const isDark = document.body.classList.toggle('dark-mode');
+  localStorage.setItem('darkMode', isDark ? '1' : '0');
+  document.getElementById('dm-icon').textContent = isDark ? '☀️' : '🌙';
+  document.getElementById('dm-label').textContent = isDark ? 'Mode clair' : 'Mode sombre';
+  // Bouton mobile
+  const bmDm = document.getElementById('bm-darkmode');
+  if (bmDm) bmDm.querySelector('.bni').textContent = isDark ? '☀️' : '🌙';
+}
+
+function initDarkMode() {
+  if (localStorage.getItem('darkMode') === '1') {
+    document.body.classList.add('dark-mode');
+    const icon = document.getElementById('dm-icon');
+    const label = document.getElementById('dm-label');
+    if (icon) icon.textContent = '☀️';
+    if (label) label.textContent = 'Mode clair';
+  }
+}
+
+// ══ GRAPHIQUE CA PAR MOIS ══
+function renderCAChart() {
+  const canvas = document.getElementById('ca-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const now = new Date();
+  const months = [];
+  const caData = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(d.toLocaleDateString('fr-FR', {month:'short'}));
+    const monthCA = history
+      .filter(h => {
+        if (h.status !== 'signe') return false;
+        try {
+          const parts = (h.date||'').split(' ');
+          const mois = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+          const m = mois.indexOf((parts[1]||'').toLowerCase());
+          const y = parseInt(parts[2]);
+          return m === d.getMonth() && y === d.getFullYear();
+        } catch(e) { return false; }
+      })
+      .reduce((s, h) => s + (parseFloat(h.ttc) || 0), 0);
+    caData.push(Math.round(monthCA));
+  }
+  const max = Math.max(...caData, 1);
+  const W = canvas.width, H = canvas.height;
+  const pad = {top:20, right:10, bottom:30, left:50};
+  ctx.clearRect(0, 0, W, H);
+  const isDark = document.body.classList.contains('dark-mode');
+  const textColor = isDark ? '#aaaaaa' : '#666666';
+  const barColor = '#2563eb';
+  const barW = (W - pad.left - pad.right) / months.length * 0.6;
+  const spacing = (W - pad.left - pad.right) / months.length;
+  months.forEach((m, i) => {
+    const x = pad.left + i * spacing + spacing * 0.2;
+    const barH = caData[i] > 0 ? ((caData[i] / max) * (H - pad.top - pad.bottom)) : 2;
+    const y = H - pad.bottom - barH;
+    ctx.fillStyle = i === months.length - 1 ? barColor : barColor + '88';
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, barH, [3, 3, 0, 0]);
+    ctx.fill();
+    // Label mois
+    ctx.fillStyle = textColor;
+    ctx.font = '10px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(m, x + barW/2, H - 8);
+    // Valeur
+    if (caData[i] > 0) {
+      ctx.fillStyle = isDark ? '#ffffff' : '#111111';
+      ctx.font = '9px Inter, sans-serif';
+      ctx.fillText(caData[i] > 999 ? Math.round(caData[i]/1000)+'k' : caData[i]+'€', x + barW/2, y - 4);
+    }
+  });
+}
+
 // ══ UTILS ══
 function closeModals(){document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('open'));}
 function toast(icon,txt){
@@ -3980,6 +4323,11 @@ document.addEventListener('DOMContentLoaded', () => {
   <button class="bottom-nav-item" id="bn-settings" onclick="goPage('settings')">
     <span class="bni">⚙️</span>
     <span>Réglages</span>
+    <div class="bni-dot"></div>
+  </button>
+  <button class="bottom-nav-item" id="bm-darkmode" onclick="toggleDarkMode()">
+    <span class="bni">🌙</span>
+    <span>Thème</span>
     <div class="bni-dot"></div>
   </button>
 </nav>
