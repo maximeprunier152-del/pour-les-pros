@@ -28,7 +28,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: `${fromName || 'DevisIA'} <onboarding@resend.dev>`,
+        from: `${fromName || 'DevisiA'} <noreply@devisia.art>`,
         reply_to: replyTo || undefined,
         to: [to],
         subject,
