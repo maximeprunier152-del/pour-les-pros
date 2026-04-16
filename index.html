@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DevisIA</title>
+  <meta name="description" content="DevisiA — Créez vos devis et factures professionnels en 2 minutes. Conçu pour les artisans.">
+  <meta name="theme-color" content="#111111">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23111'/><text y='72' x='50' text-anchor='middle' font-size='60' font-family='Arial Black' fill='white'>D</text><text y='72' x='72' text-anchor='middle' font-size='40' font-family='Arial Black' fill='%232563eb'>A</text></svg>">
+<title>DevisiA — Devis & Factures pour artisans</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -927,9 +930,120 @@ body {
   transition: opacity .15s;
 }
 .btn-import-confirm:hover { opacity: .8; }
+/* ══ LANDING PAGE ══ */
+.landing {
+  min-height: 100vh;
+  background: var(--bg);
+  display: none;
+}
+.landing.active { display: block; }
+.landing-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 40px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--bg); z-index: 10;
+}
+.landing-hero {
+  text-align: center; padding: 80px 20px 60px;
+  max-width: 700px; margin: 0 auto;
+}
+.landing-hero h1 {
+  font-family: 'Manrope', sans-serif; font-weight: 900;
+  font-size: clamp(32px, 6vw, 56px); line-height: 1.1;
+  letter-spacing: -1.5px; margin-bottom: 20px;
+}
+.landing-hero p {
+  font-size: 18px; color: var(--text2); margin-bottom: 36px; line-height: 1.6;
+}
+.landing-cta {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--text); color: var(--bg);
+  padding: 16px 32px; border-radius: 12px;
+  font-weight: 700; font-size: 16px; cursor: pointer;
+  border: none; transition: opacity .2s;
+}
+.landing-cta:hover { opacity: .85; }
+.landing-features {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px; max-width: 900px; margin: 60px auto; padding: 0 20px;
+}
+.landing-feature {
+  background: var(--bg2); border-radius: 14px; padding: 24px;
+}
+.landing-feature .feat-icon { font-size: 28px; margin-bottom: 10px; }
+.landing-feature h3 { font-weight: 700; margin-bottom: 6px; }
+.landing-feature p { font-size: 13px; color: var(--text3); line-height: 1.5; }
+.landing-footer {
+  text-align: center; padding: 40px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 13px; color: var(--text3);
+}
 </style>
 </head>
 <body>
+
+<!-- ══ LANDING PAGE ══ -->
+<div class="landing" id="landingPage">
+  <nav class="landing-nav">
+    <div class="logo" style="font-size:20px">Devisi<span style="color:var(--blue)">A</span></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="showAuth('login')" style="padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-weight:600;cursor:pointer">Connexion</button>
+      <button onclick="showAuth('register')" class="landing-cta" style="padding:8px 18px;font-size:14px">Commencer gratuitement</button>
+    </div>
+  </nav>
+
+  <div class="landing-hero">
+    <div style="display:inline-block;background:var(--bg2);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--blue);margin-bottom:20px">✨ Conçu pour les artisans français</div>
+    <h1>Créez vos devis & factures en <span style="color:var(--blue)">2 minutes</span></h1>
+    <p>DevisiA génère automatiquement vos devis professionnels grâce à l'IA. Envoyez-les par email, récupérez la signature de vos clients, et exportez pour votre comptable.</p>
+    <button class="landing-cta" onclick="showAuth('register')">
+      ⚡ Créer mon compte gratuit
+    </button>
+    <div style="margin-top:16px;font-size:13px;color:var(--text3)">Gratuit • Sans carte bancaire • Prêt en 2 min</div>
+  </div>
+
+  <div class="landing-features">
+    <div class="landing-feature">
+      <div class="feat-icon">🤖</div>
+      <h3>Génération IA</h3>
+      <p>Décrivez votre prestation en quelques mots, l'IA génère le devis complet avec les prix.</p>
+    </div>
+    <div class="landing-feature">
+      <div class="feat-icon">✍️</div>
+      <h3>Signature électronique</h3>
+      <p>Vos clients signent directement sur leur téléphone. Aucune impression nécessaire.</p>
+    </div>
+    <div class="landing-feature">
+      <div class="feat-icon">🧾</div>
+      <h3>Factures automatiques</h3>
+      <p>Dès qu'un devis est signé, la facture est générée et envoyée automatiquement.</p>
+    </div>
+    <div class="landing-feature">
+      <div class="feat-icon">📊</div>
+      <h3>Export comptable</h3>
+      <p>Exportez toutes vos factures en PDF ou CSV pour votre comptable en un clic.</p>
+    </div>
+    <div class="landing-feature">
+      <div class="feat-icon">📱</div>
+      <h3>100% mobile</h3>
+      <p>Créez et envoyez vos devis depuis votre chantier, sur téléphone ou tablette.</p>
+    </div>
+    <div class="landing-feature">
+      <div class="feat-icon">🔒</div>
+      <h3>Sécurisé</h3>
+      <p>Vos données sont stockées de façon sécurisée. Vos devis sont disponibles partout.</p>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:40px 20px;background:var(--bg2)">
+    <h2 style="font-family:'Manrope',sans-serif;font-weight:800;font-size:28px;margin-bottom:12px">Prêt à gagner du temps ?</h2>
+    <p style="color:var(--text2);margin-bottom:24px">Rejoignez les artisans qui utilisent DevisiA</p>
+    <button class="landing-cta" onclick="showAuth('register')">⚡ Commencer gratuitement</button>
+  </div>
+
+  <div class="landing-footer">
+    © 2026 DevisiA · <a href="#" style="color:var(--text3)">Mentions légales</a>
+  </div>
+</div>
 
 <!-- ══ AUTH SCREEN ══ -->
 
@@ -937,7 +1051,12 @@ body {
 
 <!-- SIDEBAR -->
 <aside class="sidebar">
-  <div class="logo">Devis<span>IA</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:8px">
+    <div style="width:28px;height:28px;background:#111;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <span style="color:#fff;font-weight:900;font-size:14px;font-family:'Manrope',sans-serif">D<span style="color:#2563eb">A</span></span>
+    </div>
+    Devisi<span>A</span>
+  </div>
   <button class="nav-item active" id="ni-devis" onclick="goPage('devis')">
     <span class="ni">✏️</span> Nouveau devis
   </button>
@@ -1255,7 +1374,7 @@ body {
 <!-- ══ AUTH SCREEN ══ -->
 <div class="auth-screen" id="authScreen">
   <div class="auth-box">
-    <div class="auth-logo">Devis<span>IA</span></div>
+    <div class="auth-logo">Devisi<span>A</span></div>
     <div class="auth-tagline">Générez vos devis pro en 2 minutes</div>
 
     <div class="auth-tabs">
@@ -1365,13 +1484,14 @@ body {
       <button onclick="closeModals()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">×</button>
     </div>
     <div id="detail-body"></div>
-    <div class="modal-actions" style="margin-top:16px">
+    <div class="modal-actions" style="margin-top:16px;flex-wrap:wrap;gap:6px">
       <button class="btn-cancel" onclick="closeModals()">Fermer</button>
-      <button class="btn-ok" onclick="exportPDFFromHistory(window._detailId)" style="background:var(--text)">⬇️ PDF devis</button>
+      <button class="btn-ok" onclick="exportPDFFromHistory(window._detailId)" style="background:var(--text)">⬇️ PDF</button>
       <button class="btn-ok" onclick="dupliquerDevis(window._detailId);closeModals()" style="background:var(--blue)">📋 Dupliquer</button>
-      <button class="btn-ok" onclick="closeModals();changeStatus(window._detailId,'signe')" id="detail-btn-sign" style="background:var(--green)">✅ Marquer signé</button>
-      <button class="btn-ok" onclick="exportFacturePDF(history.find(x=>x.id===window._detailId))" id="detail-btn-facture" style="background:var(--blue);display:none">🧾 Télécharger facture</button>
-      <button class="btn-ok" onclick="partagerLienSignature(window._detailId)" id="detail-btn-share" style="background:var(--orange)">🔗 Lien signature</button>
+      <button class="btn-ok" onclick="closeModals();changeStatus(window._detailId,'signe')" id="detail-btn-sign" style="background:var(--green)">✅ Signé</button>
+      <button class="btn-ok" onclick="exportFacturePDF(history.find(x=>x.id===window._detailId))" id="detail-btn-facture" style="background:var(--blue);display:none">🧾 Facture</button>
+      <button class="btn-ok" onclick="partagerLienSignature(window._detailId)" id="detail-btn-share" style="background:var(--orange)">🔗 Signature</button>
+      <button class="btn-ok" onclick="supprimerDevis(window._detailId)" style="background:var(--red)">🗑️ Supprimer</button>
     </div>
   </div>
 </div>
@@ -1737,8 +1857,19 @@ window.validerExtSign = async function(devisId, ent, clientEmail) {
   if (btn) btn.style.display = 'none';
 };
 
+function showAuth(mode) {
+  document.getElementById('landingPage').classList.remove('active');
+  document.getElementById('authScreen').style.display = '';
+  document.getElementById('authScreen').classList.remove('hidden');
+  switchAuth(mode || 'login');
+}
+
 function checkSession() {
-  // Toujours demander le mot de passe à chaque visite
+  // Afficher la landing page si pas connecté
+  const authScr = document.getElementById('authScreen');
+  const landing = document.getElementById('landingPage');
+  if (landing) landing.classList.add('active');
+  if (authScr) authScr.style.display = 'none';
 }
 
 // ══ STATE ══
@@ -2134,7 +2265,7 @@ async function generer() {
 
   const now=new Date();
   const valid=new Date(now.getTime()+30*24*3600*1000);
-  const num='DEV-'+now.getFullYear()+'-'+String(Math.floor(Math.random()*900)+100);
+  const num = getNextDevisNum();
   const tvaRate = parseFloat(currentUser?.tva_rate || '10') / 100;
   const ht=lignes.reduce((s,l)=>s+l.total,0),tva=Math.round(ht*tvaRate*100)/100,ttc=Math.round((ht+tva)*100)/100;
   const tvaLabel = 'TVA (' + (currentUser?.tva_rate || '10') + '%) :';
@@ -2743,7 +2874,7 @@ async function doSendEmail() {
           <p style="color:#333;line-height:1.6">${msg.split('\n').join('<br>')}</p>
           ${pdfBase64 ? '<p style="color:#666;font-size:13px">📎 Le devis est joint en pièce jointe.</p>' : ''}
           <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e8e8e8;font-size:12px;color:#999">
-            Envoyé via DevisIA
+            Envoyé via DevisiA
           </div>
         </div>
       </div>`;
@@ -2755,7 +2886,7 @@ async function doSendEmail() {
         to,
         subject,
         html: htmlBody,
-        fromName: devis?.ent || currentUser?.company || 'DevisIA',
+        fromName: devis?.ent || currentUser?.company || 'DevisiA',
         replyTo: currentUser?.email,
         pdfBase64,
         pdfName
@@ -4279,6 +4410,33 @@ function renderCAChart() {
       ctx.fillText(caData[i] > 999 ? Math.round(caData[i]/1000)+'k' : caData[i]+'€', x + barW/2, y - 4);
     }
   });
+}
+
+// ══ NUMÉROTATION SÉQUENTIELLE ══
+// ══ SUPPRIMER DEVIS ══
+async function supprimerDevis(id) {
+  if (!confirm('Supprimer définitivement ce devis ?')) return;
+  const idx = history.findIndex(x => x.id === id);
+  if (idx === -1) return;
+  history.splice(idx, 1);
+  if (currentUser) {
+    await sb.from('devis').delete().eq('num', id).eq('user_email', currentUser.email);
+  }
+  closeModals();
+  renderDash();
+  toast('🗑️', 'Devis supprimé');
+}
+
+function getNextDevisNum() {
+  const year = new Date().getFullYear();
+  // Trouver le plus grand numéro existant pour cette année
+  const existing = history
+    .map(d => d.id || '')
+    .filter(id => id.startsWith('DEV-' + year + '-'))
+    .map(id => parseInt(id.split('-')[2] || '0'))
+    .filter(n => !isNaN(n));
+  const next = existing.length ? Math.max(...existing) + 1 : 1;
+  return 'DEV-' + year + '-' + String(next).padStart(3, '0');
 }
 
 // ══ UTILS ══
