@@ -2934,15 +2934,15 @@ async function exportPDFFromHistory(id) {
     // ── TOTAUX ──
     pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(85,85,85);
     pdf.text('Total HT :', W-M-38, y); pdf.text(f(ht)+' €', W-M, y, {align:'right'}); y+=6;
-    pdf.text(devis.tvaLabel||'TVA (10%) :', W-M-38, y); pdf.text(f(tva)+' €', W-M, y, {align:'right'}); y+=4;
+    pdf.text(d.tvaLabel||'TVA (10%) :', W-M-38, y); pdf.text(f(tva)+' €', W-M, y, {align:'right'}); y+=4;
     pdf.setFillColor(17,17,17); pdf.rect(W-M-60, y, 60, 9, 'F');
     pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(10);
     pdf.text('Total TTC', W-M-58, y+6.2);
     pdf.text(f(ttc)+' €', W-M-2, y+6.2, {align:'right'});
     y+=12;
-    if (devis.acompteRate > 0) {
+    if (d.acompteRate > 0) {
       pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(37,99,235);
-      pdf.text('Acompte ' + devis.acompteRate + '% : ' + f(devis.acompteMontant) + ' €', W-M, y, {align:'right'});
+      pdf.text('Acompte ' + d.acompteRate + '% : ' + f(d.acompteMontant) + ' €', W-M, y, {align:'right'});
       y+=6;
     }
     y+=6;
@@ -2972,13 +2972,27 @@ async function exportPDFFromHistory(id) {
     y+=28;
     pdf.setDrawColor(220,220,220); pdf.line(M, y, W-M, y); y+=5;
     pdf.setFontSize(7); pdf.setTextColor(170,170,170);
-    pdf.text(devis?.conditionsPaiement || currentUser?.conditions || 'Règlement : 30% à la commande, solde à réception. Validité : 30 jours. Garantie décennale + RC pro.', M, y);
+    pdf.text(d?.conditionsPaiement || currentUser?.conditions || 'Règlement : 30% à la commande, solde à réception. Validité : 30 jours. Garantie décennale + RC pro.', M, y);
 
-    pdf.save(d.id+'.pdf');
-    toast('⬇️', 'PDF téléchargé');
+    // Compatible mobile Safari
+    const pdfBlobH = pdf.output('blob');
+    const pdfBlobUrlH = URL.createObjectURL(pdfBlobH);
+    const isSafariH = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    if (isSafariH) {
+      window.open(pdfBlobUrlH, '_blank');
+    } else {
+      const lnk = document.createElement('a');
+      lnk.href = pdfBlobUrlH;
+      lnk.download = d.id + '.pdf';
+      document.body.appendChild(lnk);
+      lnk.click();
+      document.body.removeChild(lnk);
+    }
+    setTimeout(() => URL.revokeObjectURL(pdfBlobUrlH), 3000);
+    toast('⬇️', 'PDF téléchargé', 'success');
   } catch(e) {
     console.error(e);
-    toast('⚠️', 'Erreur génération PDF');
+    toast('⚠️', 'Erreur génération PDF: ' + e.message);
   }
 }
 
@@ -3111,9 +3125,22 @@ async function exportPDF() {
 
     // Stocker le PDF en mémoire pour l'envoi par email
     devis._pdfBase64 = pdf.output('datauristring').split(',')[1];
-    pdf.save(`${d.num}.pdf`);
-    toast('⬇️','PDF téléchargé');
-  } catch(e){ toast('⬇️','PDF généré (démo)'); }
+    const pdfBlob2 = pdf.output('blob');
+    const pdfBlobUrl2 = URL.createObjectURL(pdfBlob2);
+    const isSafari2 = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    if (isSafari2) {
+      window.open(pdfBlobUrl2, '_blank');
+    } else {
+      const pdfLink2 = document.createElement('a');
+      pdfLink2.href = pdfBlobUrl2;
+      pdfLink2.download = d.num + '.pdf';
+      document.body.appendChild(pdfLink2);
+      pdfLink2.click();
+      document.body.removeChild(pdfLink2);
+    }
+    setTimeout(() => URL.revokeObjectURL(pdfBlobUrl2), 3000);
+    toast('⬇️','PDF téléchargé', 'success');
+  } catch(e){ console.error('PDF error:', e); toast('⚠️','Erreur génération PDF: ' + e.message); }
 }
 
 // ══ EMAIL ══
@@ -4142,16 +4169,37 @@ async function genererFacture(id) {
 }
 
 async function exportFacturePDF(d) {
+  if (!d) { toast('⚠️', 'Devis introuvable'); return; }
   try {
+    toast('⏳', 'Génération de la facture...');
     const base64 = await genererFacturePDFBase64(d);
-    if (!base64) return;
-    // Télécharger
-    const link = document.createElement('a');
-    link.href = 'data:application/pdf;base64,' + base64;
-    link.download = (d.num_facture||'facture') + '.pdf';
-    link.click();
-    return;
-  } catch(e) { console.error(e); }
+    if (!base64) { toast('⚠️', 'Erreur génération facture'); return; }
+
+    const fileName = (d.num_facture || 'facture') + '.pdf';
+    const byteChars = atob(base64);
+    const byteArr = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([byteArr], {type: 'application/pdf'});
+    const blobUrl = URL.createObjectURL(blob);
+
+    // iOS Safari : ouvrir dans un nouvel onglet
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    if (isSafari) {
+      window.open(blobUrl, '_blank');
+    } else {
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+    toast('🧾', 'Facture ' + fileName + ' générée !', 'success');
+  } catch(e) {
+    console.error('exportFacturePDF error:', e);
+    toast('⚠️', 'Erreur génération facture: ' + e.message);
+  }
 }
 async function exportFacturePDF_OLD(d) {
   const cachetDataUrl = await preloadCachet();
