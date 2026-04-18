@@ -4894,7 +4894,7 @@ function resetDevisForm() {
   // Réinitialiser le devis courant
   devis = null;
   document.getElementById('docBody').innerHTML = '';
-  document.getElementById('docWrap').style.display = 'none';
+  document.getElementById('docWrap').classList.remove('show');
 
   // Réinitialiser tous les champs texte libre
   const tDesc = document.getElementById('t-desc');
