@@ -2974,21 +2974,7 @@ async function exportPDFFromHistory(id) {
     pdf.setFontSize(7); pdf.setTextColor(170,170,170);
     pdf.text(d?.conditionsPaiement || currentUser?.conditions || 'Règlement : 30% à la commande, solde à réception. Validité : 30 jours. Garantie décennale + RC pro.', M, y);
 
-    // Compatible mobile Safari
-    const pdfBlobH = pdf.output('blob');
-    const pdfBlobUrlH = URL.createObjectURL(pdfBlobH);
-    const isSafariH = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    if (isSafariH) {
-      window.open(pdfBlobUrlH, '_blank');
-    } else {
-      const lnk = document.createElement('a');
-      lnk.href = pdfBlobUrlH;
-      lnk.download = d.id + '.pdf';
-      document.body.appendChild(lnk);
-      lnk.click();
-      document.body.removeChild(lnk);
-    }
-    setTimeout(() => URL.revokeObjectURL(pdfBlobUrlH), 3000);
+    downloadPDF(pdf, d.id + '.pdf');
     toast('⬇️', 'PDF téléchargé', 'success');
   } catch(e) {
     console.error(e);
@@ -3125,20 +3111,7 @@ async function exportPDF() {
 
     // Stocker le PDF en mémoire pour l'envoi par email
     devis._pdfBase64 = pdf.output('datauristring').split(',')[1];
-    const pdfBlob2 = pdf.output('blob');
-    const pdfBlobUrl2 = URL.createObjectURL(pdfBlob2);
-    const isSafari2 = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    if (isSafari2) {
-      window.open(pdfBlobUrl2, '_blank');
-    } else {
-      const pdfLink2 = document.createElement('a');
-      pdfLink2.href = pdfBlobUrl2;
-      pdfLink2.download = d.num + '.pdf';
-      document.body.appendChild(pdfLink2);
-      pdfLink2.click();
-      document.body.removeChild(pdfLink2);
-    }
-    setTimeout(() => URL.revokeObjectURL(pdfBlobUrl2), 3000);
+    downloadPDF(pdf, d.num + '.pdf');
     toast('⬇️','PDF téléchargé', 'success');
   } catch(e){ console.error('PDF error:', e); toast('⚠️','Erreur génération PDF: ' + e.message); }
 }
@@ -4171,34 +4144,84 @@ async function genererFacture(id) {
 async function exportFacturePDF(d) {
   if (!d) { toast('⚠️', 'Devis introuvable'); return; }
   try {
-    toast('⏳', 'Génération de la facture...');
-    const base64 = await genererFacturePDFBase64(d);
-    if (!base64) { toast('⚠️', 'Erreur génération facture'); return; }
+    const cachetDataUrl = await preloadCachet();
+    const {jsPDF} = window.jspdf;
+    const pdf = new jsPDF({unit:'mm', format:'a4'});
+    const W=210, M=18; let y=18;
+    const ent = d.ent || currentUser?.company || 'Votre Entreprise';
+    const ht = parseFloat(d.ht) || Math.round((parseFloat(d.ttc)||0)/1.1*100)/100;
+    const tva = parseFloat(d.tva) || Math.round(((parseFloat(d.ttc)||0)-ht)*100)/100;
+    const ttc = parseFloat(d.ttc) || 0;
+    const numFac = d.num_facture || ('FAC-' + new Date().getFullYear() + '-001');
+    const dateFacture = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
 
-    const fileName = (d.num_facture || 'facture') + '.pdf';
-    const byteChars = atob(base64);
-    const byteArr = new Uint8Array(byteChars.length);
-    for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-    const blob = new Blob([byteArr], {type: 'application/pdf'});
-    const blobUrl = URL.createObjectURL(blob);
+    // EN-TÊTE
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(16); pdf.setTextColor(17,17,17);
+    pdf.text(ent, M, y); y+=6;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(85,85,85);
+    const il = [currentUser?.address||'', currentUser?.siret?'SIRET '+currentUser.siret:'', currentUser?.phone||''].filter(Boolean).join(' · ');
+    pdf.text(il || currentUser?.email || '', M, y); y+=12;
+    pdf.setDrawColor(232,232,232); pdf.line(M,y,W-M,y); y+=8;
 
-    // iOS Safari : ouvrir dans un nouvel onglet
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    if (isSafari) {
-      window.open(blobUrl, '_blank');
-    } else {
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
-    toast('🧾', 'Facture ' + fileName + ' générée !', 'success');
+    // CLIENT + N° FACTURE
+    pdf.setFontSize(9); pdf.setTextColor(17,17,17); pdf.setFont('helvetica','bold');
+    pdf.text('CLIENT', M, y); pdf.text('N° FACTURE', W-M-38, y); y+=5;
+    pdf.setFont('helvetica','normal');
+    pdf.text(d.client||'', M, y);
+    if (d.email) { pdf.setFontSize(8); pdf.setTextColor(85,85,85); y+=4; pdf.text(d.email, M, y); y+=1; }
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.setTextColor(17,17,17);
+    pdf.text(numFac, W-M, y-4, {align:'right'}); y+=5;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(85,85,85);
+    pdf.text('Date : ' + dateFacture, M, y); y+=10;
+    pdf.setDrawColor(17,17,17); pdf.setLineWidth(.5); pdf.line(M,y,W-M,y); y+=8;
+
+    // TABLEAU
+    pdf.setFillColor(17,17,17); pdf.rect(M,y,W-2*M,7,'F');
+    pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(8);
+    pdf.text('DÉSIGNATION',M+2,y+4.8); pdf.text('QTÉ',M+98,y+4.8,{align:'center'});
+    pdf.text('PU HT',M+122,y+4.8,{align:'center'}); pdf.text('TOTAL HT',W-M-2,y+4.8,{align:'right'});
+    y+=7;
+    const lignes = (d.lignes && d.lignes.length) ? d.lignes : [{desc:d.desc||'Prestation',qty:1,pu:ht,total:ht}];
+    lignes.forEach((l,i) => {
+      if(i%2===1){pdf.setFillColor(248,248,248);pdf.rect(M,y,W-2*M,8,'F');}
+      pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(17,17,17);
+      pdf.text((l.desc||'').slice(0,50),M+2,y+5.5);
+      pdf.text(String(l.qty||1),M+98,y+5.5,{align:'center'});
+      pdf.text(f(l.pu||0)+' €',M+122,y+5.5,{align:'center'});
+      pdf.setFont('helvetica','bold'); pdf.text(f(l.total||0)+' €',W-M-2,y+5.5,{align:'right'});
+      y+=8;
+    });
+    y+=6;
+
+    // TOTAUX
+    pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(85,85,85);
+    pdf.text('Total HT :',W-M-38,y);pdf.text(f(ht)+' €',W-M,y,{align:'right'});y+=6;
+    pdf.text('TVA (10%) :',W-M-38,y);pdf.text(f(tva)+' €',W-M,y,{align:'right'});y+=4;
+    pdf.setFillColor(17,17,17);pdf.rect(W-M-60,y,60,9,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(10);
+    pdf.text('Total TTC',W-M-58,y+6.2); pdf.text(f(ttc)+' €',W-M-2,y+6.2,{align:'right'});
+    y+=18;
+
+    // CACHET
+    if(y+28>277){pdf.addPage();y=18;}
+    const colWF=(W-2*M)/2-4;
+    pdf.setDrawColor(200,200,200);pdf.setLineWidth(.3);
+    pdf.rect(M,y,colWF,28);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(150,150,150);
+    pdf.text('Cachet prestataire',M+2,y+4);
+    if(cachetDataUrl){try{pdf.addImage(cachetDataUrl,'PNG',M+2,y+6,colWF-4,18);}catch(e){}}
+    y+=32;
+
+    // PIED
+    pdf.setDrawColor(220,220,220);pdf.line(M,y,W-M,y);y+=4;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(170,170,170);
+    pdf.text(currentUser?.conditions || "Règlement à 30 jours. Pénalités de retard : 3x le taux légal.",M,y);
+
+    downloadPDF(pdf, numFac + '.pdf');
+    toast('🧾', 'Facture générée !', 'success');
   } catch(e) {
     console.error('exportFacturePDF error:', e);
-    toast('⚠️', 'Erreur génération facture: ' + e.message);
+    toast('⚠️', 'Erreur : ' + e.message);
   }
 }
 async function exportFacturePDF_OLD(d) {
@@ -4916,6 +4939,16 @@ function resetDevisForm() {
 }
 
 // ══ UTILS ══
+function downloadPDF(pdfObj, fileName) {
+  // Méthode universelle - fonctionne sur iOS, Android, Desktop
+  try {
+    pdfObj.save(fileName);
+  } catch(e) {
+    console.error('PDF save error:', e);
+    toast('⚠️', 'Erreur PDF: ' + e.message);
+  }
+}
+
 function closeModals(){document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('open'));}
 function toast(icon, txt, type) {
   const t = document.getElementById('toast');
