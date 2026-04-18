@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="DevisiA — Créez vos devis et factures professionnels en 2 minutes. Conçu pour les artisans.">
+  <meta property="og:title" content="DevisiA — Devis & Factures pour artisans">
+  <meta property="og:description" content="Générez vos devis professionnels en 2 minutes grâce à l'IA. Signature électronique, facturation automatique, export comptable.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://devisia.art">
+  <meta property="og:image" content="https://devisia.art/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="DevisiA — Devis & Factures pour artisans">
+  <meta name="twitter:description" content="Générez vos devis professionnels en 2 minutes grâce à l'IA.">
   <meta name="theme-color" content="#111111">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -1091,7 +1099,7 @@ body {
     &nbsp;·&nbsp;
     <a href="#" onclick="document.getElementById('m-cgu').classList.add('open');return false;" style="color:var(--text3)">CGU</a>
     &nbsp;·&nbsp;
-    <a href="mailto:contact@devisia.art" style="color:var(--text3)">Contact</a>
+    <a href="#" onclick="document.getElementById('m-contact').classList.add('open');return false;" style="color:var(--text3)">Contact</a>
   </div>
 </div>
 
@@ -1100,6 +1108,11 @@ body {
 <div class="shell">
 
 <!-- SIDEBAR -->
+<!-- BANDEAU DÉMO -->
+<div id="demo-banner" style="display:none;background:#fef3c7;border-bottom:1px solid #fcd34d;padding:8px 20px;text-align:center;font-size:12px;color:#92400e;z-index:100">
+  🧪 <strong>Mode démo</strong> — Vos données sont sauvegardées localement sur cet appareil. <a href="#" onclick="showAuth('login');return false;" style="color:#92400e;font-weight:700;text-decoration:underline">Connectez-vous</a> pour les synchroniser.
+</div>
+
 <aside class="sidebar">
   <div class="logo" style="display:flex;align-items:center;gap:8px">
     <div style="width:28px;height:28px;background:#111;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -1556,13 +1569,13 @@ body {
       <button onclick="closeModals()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">×</button>
     </div>
     <div id="detail-body"></div>
-    <div class="modal-actions" style="margin-top:16px;flex-wrap:wrap;gap:6px">
-      <button class="btn-cancel" onclick="closeModals()">Fermer</button>
-      <button class="btn-ok" onclick="exportPDFFromHistory(window._detailId)" style="background:var(--text)">⬇️ PDF</button>
-      <button class="btn-ok" onclick="dupliquerDevis(window._detailId);closeModals()" style="background:var(--blue)">📋 Dupliquer</button>
-      <button class="btn-ok" onclick="closeModals();changeStatus(window._detailId,'signe')" id="detail-btn-sign" style="background:var(--green)">✅ Signé</button>
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="btn-cancel" onclick="closeModals()" style="grid-column:1/-1">Fermer</button>
+      <button class="btn-ok" onclick="exportPDFFromHistory(window._detailId)" style="background:var(--text)">⬇️ PDF devis</button>
       <button class="btn-ok" onclick="exportFacturePDF(history.find(x=>x.id===window._detailId))" id="detail-btn-facture" style="background:var(--blue);display:none">🧾 Facture</button>
-      <button class="btn-ok" onclick="partagerLienSignature(window._detailId)" id="detail-btn-share" style="background:var(--orange)">🔗 Signature</button>
+      <button class="btn-ok" onclick="closeModals();changeStatus(window._detailId,'signe')" id="detail-btn-sign" style="background:var(--green)">✅ Marquer signé</button>
+      <button class="btn-ok" onclick="partagerLienSignature(window._detailId)" style="background:var(--orange)">🔗 Lien signature</button>
+      <button class="btn-ok" onclick="dupliquerDevis(window._detailId);closeModals()" style="background:var(--blue)">📋 Dupliquer</button>
       <button class="btn-ok" onclick="supprimerDevis(window._detailId)" style="background:var(--red)">🗑️ Supprimer</button>
     </div>
   </div>
@@ -1858,6 +1871,9 @@ async function doRegister() {
 
 async function loginSuccess(user) {
   currentUser = user;
+  // Masquer le bandeau démo
+  const demoBanner = document.getElementById('demo-banner');
+  if (demoBanner) demoBanner.style.display = 'none';
   const authScr = document.getElementById('authScreen');
   if(authScr) authScr.classList.add('hidden');
   if (user.company) {
@@ -1916,6 +1932,30 @@ if ('serviceWorker' in navigator) {
       .then(() => console.log('SW registered'))
       .catch(err => console.log('SW error:', err));
   });
+}
+
+async function sendContactForm() {
+  const nom = document.getElementById('contact-nom').value.trim();
+  const email = document.getElementById('contact-email').value.trim();
+  const msg = document.getElementById('contact-msg').value.trim();
+  if (!nom || !email || !msg) { toast('⚠️', 'Remplissez tous les champs'); return; }
+  try {
+    await fetch('/api/send-email', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        to: 'contact@devisia.art',
+        subject: 'Contact DevisiA — ' + nom,
+        html: '<p><strong>De :</strong> ' + nom + ' (' + email + ')</p><p>' + msg.split('\n').join('<br>') + '</p>',
+        fromName: 'DevisiA Contact',
+        replyTo: email
+      })
+    });
+    document.getElementById('contact-success').style.display = 'block';
+    document.getElementById('contact-nom').value = '';
+    document.getElementById('contact-email').value = '';
+    document.getElementById('contact-msg').value = '';
+  } catch(e) { toast('❌', "Erreur d'envoi", 'error'); }
 }
 
 function initCookieBanner() {
@@ -2014,11 +2054,112 @@ function showAuth(mode) {
 }
 
 function checkSession() {
-  // Afficher la landing page si pas connecté
+  // Vérifier si données démo en localStorage
+  const demoData = localStorage.getItem('devisia_demo_devis');
+  const demoSettings = localStorage.getItem('devisia_demo_settings');
+
+  // Si données démo, charger en mode démo
+  if (demoData || demoSettings) {
+    enterDemoMode();
+    return;
+  }
+
+  // Sinon afficher la landing
   const authScr = document.getElementById('authScreen');
   const landing = document.getElementById('landingPage');
   if (landing) landing.classList.add('active');
   if (authScr) authScr.style.display = 'none';
+}
+
+function enterDemoMode() {
+  // Mode démo - pas besoin de compte
+  const demoBanner = document.getElementById('demo-banner');
+  if (demoBanner) demoBanner.style.display = 'block';
+  const landing = document.getElementById('landingPage');
+  if (landing) landing.classList.remove('active');
+  const authScr = document.getElementById('authScreen');
+  if (authScr) authScr.classList.add('hidden');
+
+  // Créer un utilisateur démo
+  currentUser = {
+    email: 'demo@devisia.art',
+    name: 'Artisan',
+    company: localStorage.getItem('devisia_demo_company') || 'Mon Entreprise',
+    address: localStorage.getItem('devisia_demo_address') || '',
+    siret: localStorage.getItem('devisia_demo_siret') || '',
+    phone: localStorage.getItem('devisia_demo_phone') || '',
+    tva_rate: '10',
+    acompte: '30',
+    conditions: '30% à la commande, solde à réception.',
+    _isDemo: true
+  };
+
+  // Charger les devis démo
+  try {
+    const demoDevis = JSON.parse(localStorage.getItem('devisia_demo_devis') || '[]');
+    history = demoDevis;
+  } catch(e) { history = []; }
+
+  // Charger le catalogue démo
+  try {
+    const demoCat = JSON.parse(localStorage.getItem('devisia_demo_catalogue') || '[]');
+    catalogue = demoCat.length ? demoCat : [...DEFAULT_CATALOGUE];
+  } catch(e) { catalogue = [...DEFAULT_CATALOGUE]; }
+
+  const badge = document.getElementById('userBadge');
+  const uName = document.getElementById('userName');
+  const uEmail = document.getElementById('userEmail');
+  if (badge) badge.style.display = 'flex';
+  if (uName) uName.textContent = currentUser.company;
+  if (uEmail) uEmail.textContent = 'Mode démo';
+
+  ['t-ent','v-ent','f-ent'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = currentUser.company;
+  });
+
+  renderDash(); renderCat(); renderCatChips();
+  // Afficher onboarding si premier lancement
+  if (!localStorage.getItem('devisia_onboarded_' + (user.email||'demo'))) {
+    setTimeout(showOnboarding, 800);
+  }
+}
+
+function showOnboarding() {
+  if (document.getElementById('m-onboarding')) return;
+  const modal = document.createElement('div');
+  modal.id = 'm-onboarding';
+  modal.className = 'overlay open';
+  modal.innerHTML = `
+    <div class="modal" style="width:440px;max-width:95vw">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:36px;margin-bottom:8px">🎉</div>
+        <div class="modal-title" style="margin-bottom:4px">Bienvenue sur DevisiA !</div>
+        <div style="font-size:13px;color:var(--text3)">Voici vos 3 premières étapes pour bien démarrer</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg2);border-radius:10px">
+          <div style="width:28px;height:28px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0">1</div>
+          <div><div style="font-weight:600;font-size:13px">Configurez votre entreprise</div><div style="font-size:12px;color:var(--text3)">Ajoutez votre logo, SIRET et adresse dans les Réglages</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg2);border-radius:10px">
+          <div style="width:28px;height:28px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0">2</div>
+          <div><div style="font-weight:600;font-size:13px">Créez votre premier devis</div><div style="font-size:12px;color:var(--text3)">Décrivez votre prestation, l'IA fait le reste en 2 min</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg2);border-radius:10px">
+          <div style="width:28px;height:28px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0">3</div>
+          <div><div style="font-weight:600;font-size:13px">Envoyez-le à votre client</div><div style="font-size:12px;color:var(--text3)">Par email avec le lien de signature électronique</div></div>
+        </div>
+      </div>
+      <button onclick="closeOnboarding()" style="width:100%;padding:12px;background:var(--text);color:var(--bg);border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">⚡ C'est parti !</button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function closeOnboarding() {
+  const m = document.getElementById('m-onboarding');
+  if (m) m.remove();
+  localStorage.setItem('devisia_onboarded_' + (currentUser?.email||'demo'), '1');
 }
 
 // ══ STATE ══
@@ -2266,6 +2407,7 @@ async function goPage(p) {
   if(p==='cat') { renderCat(); renderCatChips(); }
   if(p==='devis') { renderCatChips(); }
   if(p==='settings') { openSettings(); }
+  if(p==='devis') { resetDevisForm(); }
   if(p==='dash' && currentUser) {
     const { data } = await sb.from('devis').select('*').eq('user_email',currentUser.email).order('created_at',{ascending:false});
     if(data) history = data.map(d => {
@@ -2424,7 +2566,7 @@ async function generer() {
 
   devis={num,ent:data.ent||'Votre Entreprise',cli:data.cli||'Client',
     emailCli:data.email, telCli:data.tel||'',
-    objet:data.objet||lignes[0]?.desc||'Prestation',
+    objet:(data.objet||lignes[0]?.desc||'Prestation').slice(0,60),
     lignes,ht,tva,ttc,tvaRate,tvaLabel,acompteRate,acompteMontant,conditionsPaiement,
     date:now.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}),
     valid:valid.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}),
@@ -2445,6 +2587,12 @@ async function generer() {
   history.unshift(newDevis);
   // Sauvegarder dans Supabase avec await
   if(currentUser) {
+    // Mode démo : sauvegarder en localStorage
+    if (currentUser._isDemo) {
+      const demoDevis = JSON.parse(localStorage.getItem('devisia_demo_devis') || '[]');
+      demoDevis.unshift(newDevis);
+      localStorage.setItem('devisia_demo_devis', JSON.stringify(demoDevis));
+    } else {
     // Stocker les lignes détaillées en JSON dans description
     const lignesJSON = JSON.stringify(devis.lignes || []);
     const {error: insertErr} = await sb.from('devis').insert([{
@@ -2457,6 +2605,7 @@ async function generer() {
       status: 'attente'
     }]);
     if(insertErr) console.error('Devis insert error:', insertErr);
+    } // fin else mode connecté
   }
 }
 
@@ -2467,10 +2616,42 @@ function getData() {
 }
 
 async function callClaude(description) {
-  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:`Analyse cette prestation d'artisan français et génère des lignes de devis en JSON uniquement, sans markdown.\n\nDescription: "${description}"\n\nFormat: [{"desc":"Nom","sous":"détail court","qty":1,"pu":55,"total":55}]\nExtrait chaque prestation distincte. Prix réalistes marché français.`}]})});
-  const data=await resp.json();
-  const txt=data.content?.[0]?.text||'[]';
-  return JSON.parse(txt.replace(/```json|```/g,'').trim());
+  const systemPrompt = `Tu es un expert en devis pour artisans français. 
+RÈGLES ABSOLUES :
+1. Tu DOIS respecter exactement les prix et quantités mentionnés par l'utilisateur.
+2. Ne génère JAMAIS des montants génériques si l'utilisateur en a mentionné.
+3. Si l'utilisateur dit "3h à 55€/h" → {desc:"Main d'œuvre", qty:3, pu:55, total:165}
+4. Si l'utilisateur dit "matériel 420€" → {desc:"Fournitures", qty:1, pu:420, total:420}
+5. Si l'utilisateur dit "déplacement 30€" → {desc:"Déplacement", qty:1, pu:30, total:30}
+6. Extrait chaque prestation distincte mentionnée.
+7. Pour les prestations non tarifées, utilise des prix réalistes du marché français.
+8. Réponds UNIQUEMENT en JSON, sans markdown ni explication.`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: `Génère les lignes de devis pour cette prestation d'artisan français.
+
+Description: "${description}"
+
+Format JSON attendu (tableau de lignes) :
+[{"desc":"Nom de la prestation","sous":"détail optionnel","qty":1,"pu":55,"total":55}]
+
+Important: total = qty × pu exactement.`
+      }]
+    })
+  });
+  const data = await resp.json();
+  const txt = data.content?.[0]?.text || '[]';
+  const parsed = JSON.parse(txt.replace(/\`\`\`json|\`\`\`/g, '').trim());
+  // Vérifier que les totaux sont corrects
+  return parsed.map(l => ({...l, total: Math.round(l.qty * l.pu * 100) / 100}));
 }
 
 function fallback(desc) {
@@ -2522,7 +2703,7 @@ async function renderDoc(d) {
       <div class="doc-party"><div class="doc-party-label">Prestataire</div><div class="doc-party-name">${d.ent}</div><div class="doc-party-info">${currentUser?.email||''}</div></div>
       <div class="doc-party"><div class="doc-party-label">Client</div><div class="doc-party-name">${d.cli}</div><div class="doc-party-info">${d.emailCli||''}${d.telCli ? '<br>📞 '+d.telCli : ''}</div></div>
     </div>
-    <div class="doc-objet"><div class="doc-objet-label">Objet</div><div class="doc-objet-text">${d.objet}</div></div>
+    <div class="doc-objet"><div class="doc-objet-label">Objet</div><div class="doc-objet-text" style="word-break:break-word;max-width:100%">${d.objet.length > 60 ? d.objet.slice(0,60)+'...' : d.objet}</div></div>
     <table class="doc-table">
       <thead><tr><th style="width:50%">Désignation</th><th>Qté</th><th>PU HT</th><th>Total HT</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -3052,11 +3233,11 @@ async function doSendEmail() {
       if (currentUser) sb.from('devis').update({status:'envoye'}).eq('num',devis.num).eq('user_email',currentUser.email);
     }
     closeModals();
-    toast('✉️', 'Devis envoyé à ' + to + ' !');
+    toast('✉️', '✅ Devis envoyé à ' + to + ' !', 'success');
 
   } catch(e) {
     console.error('Send error:', e);
-    toast('⚠️', 'Erreur : ' + e.message);
+    toast('❌', 'Erreur d\'envoi — vérifiez votre connexion', 'error');
   } finally {
     btn.textContent = 'Envoyer'; btn.disabled = false;
   }
@@ -3597,11 +3778,22 @@ function openDevisDetail(id) {
   const btnFac = document.getElementById('detail-btn-facture');
   const btnSign = document.getElementById('detail-btn-sign');
   if (d2 && d2.status === 'signe') {
-    if (btnFac) btnFac.style.display = '';
+    if (btnFac) { btnFac.style.display = ''; btnFac.style.removeProperty('display'); }
     if (btnSign) btnSign.style.display = 'none';
+    // Si pas de num_facture, en générer un
+    if (d2 && !d2.num_facture) {
+      const year = new Date().getFullYear();
+      const existing = history.filter(h => h.num_facture && h.num_facture.startsWith('FAC-' + year));
+      const nums = existing.map(h => parseInt((h.num_facture||'').split('-')[2]||0)).filter(n => !isNaN(n));
+      const next = nums.length ? Math.max(...nums) + 1 : 1;
+      d2.num_facture = 'FAC-' + year + '-' + String(next).padStart(3, '0');
+      if (currentUser && !currentUser._isDemo) {
+        sb.from('devis').update({num_facture: d2.num_facture}).eq('num', id).eq('user_email', currentUser.email);
+      }
+    }
   } else {
     if (btnFac) btnFac.style.display = 'none';
-    if (btnSign) btnSign.style.display = '';
+    if (btnSign) { btnSign.style.display = ''; btnSign.style.removeProperty('display'); }
   }
   document.getElementById('m-detail').classList.add('open');
 }
@@ -3878,6 +4070,21 @@ async function saveSettings() {
   const email_pro = document.getElementById('set-email-pro').value.trim();
 
   if (!company) { toast('⚠️', "Le nom de l'entreprise est requis"); return; }
+  // Mode démo : sauvegarder dans localStorage
+  if (currentUser?._isDemo) {
+    currentUser = { ...currentUser, company, name, address, siret, phone };
+    localStorage.setItem('devisia_demo_company', company);
+    localStorage.setItem('devisia_demo_address', address);
+    localStorage.setItem('devisia_demo_siret', siret);
+    localStorage.setItem('devisia_demo_phone', phone);
+    ['t-ent','v-ent','f-ent'].forEach(id => { const el = document.getElementById(id); if(el) el.value = company; });
+    const uName = document.getElementById('userName');
+    if (uName) uName.textContent = company;
+    toast('✅', 'Réglages sauvegardés !', 'success');
+    document.querySelector('#page-settings .btn-primary').textContent = '💾 Enregistrer';
+    document.querySelector('#page-settings .btn-primary').disabled = false;
+    return;
+  }
 
   const btn = document.querySelector('#page-settings .btn-primary');
   btn.textContent = 'Enregistrement…'; btn.disabled = true;
@@ -4611,13 +4818,64 @@ function getNextDevisNum() {
   return 'DEV-' + year + '-' + String(next).padStart(3, '0');
 }
 
+// ══ RESET FORMULAIRE ══
+function resetDevisForm() {
+  // Réinitialiser le devis courant
+  devis = null;
+  document.getElementById('docBody').innerHTML = '';
+  document.getElementById('docWrap').style.display = 'none';
+
+  // Réinitialiser tous les champs texte libre
+  const tDesc = document.getElementById('t-desc');
+  const tCli = document.getElementById('t-cli');
+  const tEmail = document.getElementById('t-email');
+  if (tDesc) tDesc.value = '';
+  if (tCli) tCli.value = '';
+  if (tEmail) tEmail.value = '';
+
+  // Réinitialiser formulaire manuel
+  const fCli = document.getElementById('f-cli');
+  const fEmail = document.getElementById('f-email');
+  const fObj = document.getElementById('f-obj');
+  const fTelCli = document.getElementById('f-tel-cli');
+  if (fCli) fCli.value = '';
+  if (fEmail) fEmail.value = '';
+  if (fObj) fObj.value = '';
+  if (fTelCli) fTelCli.value = '';
+
+  // Réinitialiser les lignes du formulaire
+  const lignesContainer = document.getElementById('lignes');
+  if (lignesContainer) {
+    lignesContainer.innerHTML = '';
+    addLigne(); // Une ligne vide par défaut
+  }
+
+  // Réinitialiser vocal
+  const vCli = document.getElementById('v-cli');
+  const vEmail = document.getElementById('v-email');
+  const vTrans = document.getElementById('vtrans');
+  if (vCli) vCli.value = '';
+  if (vEmail) vEmail.value = '';
+  if (vTrans) vTrans.textContent = '';
+
+  // Remettre le nom entreprise
+  if (currentUser?.company) {
+    ['t-ent','v-ent','f-ent'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = currentUser.company;
+    });
+  }
+}
+
 // ══ UTILS ══
 function closeModals(){document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('open'));}
-function toast(icon,txt){
-  const t=document.getElementById('toast');
-  document.getElementById('ti').textContent=icon+' ';
-  document.getElementById('tt').textContent=txt;
-  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
+function toast(icon, txt, type) {
+  const t = document.getElementById('toast');
+  document.getElementById('ti').textContent = icon + ' ';
+  document.getElementById('tt').textContent = txt;
+  t.style.background = type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : 'var(--text)';
+  t.classList.add('show');
+  setTimeout(() => { t.classList.remove('show'); t.style.background = ''; }, 3500);
 }
 function f(n) {
   const num = parseFloat(n) || 0;
@@ -4661,6 +4919,35 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="bni-dot"></div>
   </button>
 </nav>
+<!-- ══ CONTACT ══ -->
+<div class="overlay" id="m-contact">
+  <div class="modal" style="width:480px;max-width:95vw">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="modal-title" style="margin-bottom:0">Nous contacter</div>
+      <button onclick="closeModals()" style="background:none;border:none;font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div class="auth-field">
+      <label>Nom</label>
+      <input type="text" id="contact-nom" placeholder="Jean Durand">
+    </div>
+    <div class="auth-field">
+      <label>Email</label>
+      <input type="email" id="contact-email" placeholder="vous@email.fr">
+    </div>
+    <div class="auth-field">
+      <label>Message</label>
+      <textarea id="contact-msg" placeholder="Votre message..." style="width:100%;min-height:100px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text);resize:vertical"></textarea>
+    </div>
+    <div id="contact-success" style="display:none;background:#f0fdf4;border-radius:8px;padding:12px;font-size:13px;color:var(--green);margin-bottom:12px">
+      ✅ Message envoyé ! Nous vous répondrons sous 24h.
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModals()">Annuler</button>
+      <button class="btn-ok" onclick="sendContactForm()">Envoyer →</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MENTIONS LÉGALES ══ -->
 <div class="overlay" id="m-mentions">
   <div class="modal" style="width:600px;max-width:95vw;max-height:85vh;overflow-y:auto">
