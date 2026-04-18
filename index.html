@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="DevisiA — Créez vos devis et factures professionnels en 2 minutes. Conçu pour les artisans.">
   <meta name="theme-color" content="#111111">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="DevisiA">
+  <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23111'/><text y='72' x='50' text-anchor='middle' font-size='60' font-family='Arial Black' fill='white'>D</text><text y='72' x='72' text-anchor='middle' font-size='40' font-family='Arial Black' fill='%232563eb'>A</text></svg>">
 <title>DevisiA — Devis & Factures pour artisans</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -1034,6 +1038,47 @@ body {
     </div>
   </div>
 
+  <!-- TARIFS -->
+  <div style="max-width:800px;margin:0 auto;padding:60px 20px 40px">
+    <div style="text-align:center;margin-bottom:40px">
+      <h2 style="font-family:'Manrope',sans-serif;font-weight:900;font-size:32px;margin-bottom:8px">Tarifs simples et transparents</h2>
+      <p style="color:var(--text2)">Commencez gratuitement, évoluez selon vos besoins</p>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <!-- Gratuit -->
+      <div style="border:1px solid var(--border);border-radius:16px;padding:28px">
+        <div style="font-weight:700;font-size:16px;margin-bottom:4px">Gratuit</div>
+        <div style="font-size:36px;font-weight:900;font-family:'Manrope',sans-serif;margin:12px 0">0€<span style="font-size:14px;font-weight:400;color:var(--text3)">/mois</span></div>
+        <ul style="list-style:none;padding:0;margin:16px 0;font-size:13px;color:var(--text2);line-height:2">
+          <li>✅ 5 devis par mois</li>
+          <li>✅ Génération IA</li>
+          <li>✅ Signature électronique</li>
+          <li>✅ Export PDF</li>
+          <li>✅ Cachet/logo personnalisé</li>
+          <li style="color:var(--text3)">❌ Relances automatiques</li>
+          <li style="color:var(--text3)">❌ Export comptable CSV</li>
+        </ul>
+        <button onclick="showAuth('register')" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-weight:600;cursor:pointer;font-size:14px">Commencer gratuitement</button>
+      </div>
+      <!-- Pro -->
+      <div style="border:2px solid var(--text);border-radius:16px;padding:28px;position:relative">
+        <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:3px 14px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap">⭐ Le plus populaire</div>
+        <div style="font-weight:700;font-size:16px;margin-bottom:4px">Pro</div>
+        <div style="font-size:36px;font-weight:900;font-family:'Manrope',sans-serif;margin:12px 0">9€<span style="font-size:14px;font-weight:400;color:var(--text3)">/mois</span></div>
+        <ul style="list-style:none;padding:0;margin:16px 0;font-size:13px;color:var(--text2);line-height:2">
+          <li>✅ Devis <strong>illimités</strong></li>
+          <li>✅ Génération IA avancée</li>
+          <li>✅ Signature électronique</li>
+          <li>✅ Export PDF</li>
+          <li>✅ Cachet/logo personnalisé</li>
+          <li>✅ Relances automatiques</li>
+          <li>✅ Export comptable CSV</li>
+        </ul>
+        <button onclick="showAuth('register')" style="width:100%;padding:12px;border:none;border-radius:8px;background:var(--text);color:var(--bg);font-weight:600;cursor:pointer;font-size:14px">Commencer gratuitement</button>
+      </div>
+    </div>
+  </div>
+
   <div style="text-align:center;padding:40px 20px;background:var(--bg2)">
     <h2 style="font-family:'Manrope',sans-serif;font-weight:800;font-size:28px;margin-bottom:12px">Prêt à gagner du temps ?</h2>
     <p style="color:var(--text2);margin-bottom:24px">Rejoignez les artisans qui utilisent DevisiA</p>
@@ -1041,7 +1086,12 @@ body {
   </div>
 
   <div class="landing-footer">
-    © 2026 DevisiA · <a href="#" style="color:var(--text3)">Mentions légales</a>
+    © 2026 DevisiA &nbsp;·&nbsp; 
+    <a href="#" onclick="document.getElementById('m-mentions').classList.add('open');return false;" style="color:var(--text3)">Mentions légales</a>
+    &nbsp;·&nbsp;
+    <a href="#" onclick="document.getElementById('m-cgu').classList.add('open');return false;" style="color:var(--text3)">CGU</a>
+    &nbsp;·&nbsp;
+    <a href="mailto:contact@devisia.art" style="color:var(--text3)">Contact</a>
   </div>
 </div>
 
@@ -1149,7 +1199,7 @@ body {
         <div class="row2">
           <div class="field"><label>Objet du devis</label><input type="text" id="f-obj" placeholder="Remplacement chauffe-eau 200L"></div>
           <div class="field"><label>Email client</label><input type="email" id="f-email" placeholder="client@email.fr"></div>
-        <div class="field"><label>Téléphone client <span style="font-weight:400;color:var(--text3)">(optionnel)</span></label><input type="tel" id="f-tel-cli" placeholder="06 12 34 56 78"></div>
+        <div class="field"><label>Téléphone client <span style="font-weight:400;color:var(--text3)">(optionnel)</span></label><input type="tel" id="f-tel-cli" placeholder="06 12 34 56 78" autocomplete="off" name="tel-client-devisia"></div>
         </div>
       </div>
 
@@ -1311,7 +1361,11 @@ body {
       </div>
       <div class="field"><label>Adresse</label><input type="text" id="set-address" placeholder="12 rue des Lilas, 69000 Lyon"></div>
       <div class="row2">
-        <div class="field"><label>SIRET</label><input type="text" id="set-siret" placeholder="123 456 789 00012"></div>
+        <div class="field">
+          <label>SIRET</label>
+          <input type="text" id="set-siret" placeholder="123 456 789 00012" oninput="validateSiret(this,'set-siret-err')" maxlength="17">
+          <div id="set-siret-err" style="color:var(--red);font-size:11px;margin-top:3px;display:none">SIRET invalide (14 chiffres requis)</div>
+        </div>
         <div class="field"><label>Téléphone</label><input type="tel" id="set-phone" placeholder="06 12 34 56 78"></div>
       </div>
       <div class="field"><label>Email professionnel</label><input type="email" id="set-email-pro" placeholder="contact@entreprise.fr"></div>
@@ -1396,7 +1450,24 @@ body {
         <input type="password" id="li-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <button class="auth-btn" onclick="doLogin()">Se connecter →</button>
+      <div class="auth-sep" style="margin-top:8px"><a href="#" onclick="showForgotPassword();return false;" style="color:var(--text3);text-decoration:none;font-size:12px">Mot de passe oublié ?</a></div>
       <div class="auth-sep">Pas encore de compte ? <a href="#" onclick="switchAuth('register');return false;" style="color:var(--blue);text-decoration:none;font-weight:500">S'inscrire</a></div>
+    </div>
+
+    <!-- MOT DE PASSE OUBLIÉ -->
+    <div id="formForgot" style="display:none">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5">
+        Entrez votre email et nous vous enverrons un lien pour réinitialiser votre mot de passe.
+      </div>
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="forgot-email" placeholder="vous@email.fr" onkeydown="if(event.key==='Enter')doForgotPassword()">
+      </div>
+      <div id="forgot-success" style="display:none;background:#f0fdf4;border-radius:8px;padding:12px;font-size:13px;color:var(--green);margin-bottom:12px">
+        ✅ Email envoyé ! Vérifiez votre boîte mail.
+      </div>
+      <button class="auth-btn" onclick="doForgotPassword()">Envoyer le lien →</button>
+      <div class="auth-sep"><a href="#" onclick="switchAuth('login');return false;" style="color:var(--blue);text-decoration:none;font-weight:500">← Retour à la connexion</a></div>
     </div>
 
     <!-- REGISTER -->
@@ -1433,7 +1504,8 @@ body {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div class="auth-field">
           <label>SIRET <span style="font-weight:400;color:var(--text3)">(optionnel)</span></label>
-          <input type="text" id="re-siret" placeholder="123 456 789 00012" onkeydown="if(event.key==='Enter')doRegister()">
+          <input type="text" id="re-siret" placeholder="123 456 789 00012" onkeydown="if(event.key==='Enter')doRegister()" oninput="validateSiret(this,'re-siret-err')" maxlength="17">
+          <div id="re-siret-err" style="color:var(--red);font-size:11px;margin-top:3px;display:none">SIRET invalide (14 chiffres requis)</div>
         </div>
         <div class="auth-field">
           <label>Téléphone <span style="font-weight:400;color:var(--text3)">(optionnel)</span></label>
@@ -1660,6 +1732,7 @@ function hashPwd(pwd) {
 function switchAuth(mode) {
   document.getElementById('formLogin').style.display = mode === 'login' ? 'block' : 'none';
   document.getElementById('formRegister').style.display = mode === 'register' ? 'block' : 'none';
+  document.getElementById('formForgot').style.display = mode === 'forgot' ? 'block' : 'none';
   document.getElementById('atLogin').classList.toggle('active', mode === 'login');
   document.getElementById('atRegister').classList.toggle('active', mode === 'register');
   document.getElementById('authError').classList.remove('show');
@@ -1668,6 +1741,58 @@ function switchAuth(mode) {
 function showAuthError(msg) {
   const el = document.getElementById('authError');
   el.textContent = msg; el.classList.add('show');
+}
+
+function showForgotPassword() {
+  switchAuth('forgot');
+  document.getElementById('forgot-success').style.display = 'none';
+  document.getElementById('forgot-email').value = document.getElementById('li-email')?.value || '';
+}
+
+async function doForgotPassword() {
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email) { showAuthError('Veuillez entrer votre email.'); return; }
+
+  const btn = document.querySelector('#formForgot .auth-btn');
+  btn.textContent = 'Envoi…'; btn.disabled = true;
+
+  try {
+    // Vérifier que l'email existe dans notre base
+    const { data } = await sb.from('users').select('email').eq('email', email.toLowerCase()).single();
+    if (!data) {
+      showAuthError('Aucun compte trouvé avec cet email.');
+      btn.textContent = 'Envoyer le lien →'; btn.disabled = false;
+      return;
+    }
+    // Envoyer un email avec un lien de réinitialisation via notre API
+    const tempPwd = Math.random().toString(36).slice(2, 10);
+    const newHash = hashPwd(tempPwd);
+    await sb.from('users').update({password_hash: newHash}).eq('email', email.toLowerCase());
+
+    // Envoyer le mot de passe temporaire par email
+    await fetch('/api/send-email', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        to: email,
+        subject: 'DevisiA — Réinitialisation de votre mot de passe',
+        html: '<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto">'
+          + '<div style="background:#111;padding:20px;border-radius:8px 8px 0 0"><h2 style="color:#fff;margin:0">DevisiA</h2></div>'
+          + '<div style="padding:24px;border:1px solid #e8e8e8;border-top:none;border-radius:0 0 8px 8px">'
+          + '<p>Votre mot de passe temporaire est :</p>'
+          + '<div style="background:#f5f5f5;padding:16px;border-radius:8px;font-size:24px;font-weight:800;text-align:center;letter-spacing:4px">' + tempPwd + '</div>'
+          + '<p style="color:#666;font-size:13px;margin-top:16px">Connectez-vous avec ce mot de passe puis changez-le dans les Réglages.</p>'
+          + '</div></div>',
+        fromName: 'DevisiA'
+      })
+    });
+
+    document.getElementById('forgot-success').style.display = 'block';
+    showAuthError('');
+  } catch(e) {
+    showAuthError("Erreur lors de l'envoi. Réessayez.");
+  }
+  btn.textContent = 'Envoyer le lien →'; btn.disabled = false;
 }
 
 async function doLogin() {
@@ -1780,8 +1905,32 @@ function doLogout() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initDarkMode();
-  if (checkSignatureParam()) return; // Page signature externe
+  if (checkSignatureParam()) return;
+  initCookieBanner();
 });
+
+// Enregistrement Service Worker PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => console.log('SW registered'))
+      .catch(err => console.log('SW error:', err));
+  });
+}
+
+function initCookieBanner() {
+  if (!localStorage.getItem('cookie_consent')) {
+    document.getElementById('cookie-banner').style.display = 'flex';
+  }
+}
+function acceptCookies() {
+  localStorage.setItem('cookie_consent', '1');
+  document.getElementById('cookie-banner').style.display = 'none';
+}
+function refuseCookies() {
+  localStorage.setItem('cookie_consent', '0');
+  document.getElementById('cookie-banner').style.display = 'none';
+}
 
 function checkSignatureParam() {
   const params = new URLSearchParams(window.location.search);
@@ -2991,6 +3140,15 @@ function renderDash() {
 
   const SL={'envoye':'Envoyé','ouvert':'Ouvert','signe':'Facturé ✅','attente':'En attente','relance':'À relancer'};
   const SC={'envoye':'b-envoye','ouvert':'b-ouvert','signe':'b-signe','attente':'b-attente','relance':'b-relance'};
+  if (history.length === 0) {
+    document.getElementById('devis-tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;padding:48px 20px">
+      <div style="font-size:48px;margin-bottom:12px">📄</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:6px">Vous n'avez pas encore de devis</div>
+      <div style="color:var(--text3);font-size:13px;margin-bottom:16px">Créez votre premier devis en 2 minutes grâce à l'IA</div>
+      <button onclick="goPage('devis')" style="padding:10px 20px;background:var(--text);color:var(--bg);border:none;border-radius:8px;font-weight:600;cursor:pointer">⚡ Créer mon premier devis</button>
+    </td></tr>`;
+    return;
+  }
   document.getElementById('devis-tbody').innerHTML=history.map(d=>`<tr style="cursor:pointer" data-status="${d.status}" onclick="openDevisDetail('${d.id}')" title="Cliquer pour consulter">
     <td style="font-weight:500;color:var(--text2)">${d.id}</td>
     <td style="font-weight:500">${d.client}</td>
@@ -3030,10 +3188,11 @@ function getCatIcon(cat) {
 function renderCat() {
   if (!catalogue.length) {
     document.getElementById('cat-grid').innerHTML = `
-      <div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--text3);">
-        <div style="font-size:32px;margin-bottom:10px">📦</div>
-        <div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:6px">Catalogue vide</div>
-        <div style="font-size:13px">Ajoutez vos prestations pour les retrouver rapidement lors de la création de devis</div>
+      <div style="grid-column:1/-1;text-align:center;padding:48px 20px">
+        <div style="font-size:48px;margin-bottom:12px">📦</div>
+        <div style="font-weight:700;font-size:16px;margin-bottom:6px;color:var(--text)">Votre catalogue est vide</div>
+        <div style="color:var(--text3);font-size:13px;margin-bottom:16px">Ajoutez vos prestations pour les réutiliser rapidement dans vos devis</div>
+        <button onclick="openCatModal()" style="padding:10px 20px;background:var(--text);color:var(--bg);border:none;border-radius:8px;font-weight:600;cursor:pointer">+ Ajouter une prestation</button>
       </div>`;
     return;
   }
@@ -4427,6 +4586,19 @@ async function supprimerDevis(id) {
   toast('🗑️', 'Devis supprimé');
 }
 
+function validateSiret(input, errId) {
+  const val = input.value.replace(/ /g, '').replace(/-/g, '');
+  const errEl = document.getElementById(errId);
+  if (!errEl) return true;
+  if (val.length === 0) { errEl.style.display = 'none'; return true; }
+  if (val.length > 0 && (val.length !== 14 || isNaN(Number(val)))) {
+    errEl.style.display = 'block';
+    return false;
+  }
+  errEl.style.display = 'none';
+  return true;
+}
+
 function getNextDevisNum() {
   const year = new Date().getFullYear();
   // Trouver le plus grand numéro existant pour cette année
@@ -4489,5 +4661,96 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="bni-dot"></div>
   </button>
 </nav>
+<!-- ══ MENTIONS LÉGALES ══ -->
+<div class="overlay" id="m-mentions">
+  <div class="modal" style="width:600px;max-width:95vw;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="modal-title" style="margin-bottom:0">Mentions légales</div>
+      <button onclick="closeModals()" style="background:none;border:none;font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.7">
+      <h3 style="color:var(--text);margin:16px 0 6px">Éditeur du site</h3>
+      <p>DevisiA est édité par Maxime Prunier, auto-entrepreneur.<br>
+      Email : contact@devisia.art<br>
+      Site : https://devisia.art</p>
+
+      <h3 style="color:var(--text);margin:16px 0 6px">Hébergement</h3>
+      <p>Ce site est hébergé par <strong>Vercel Inc.</strong><br>
+      340 Pine Street, Suite 701, San Francisco, CA 94104, USA<br>
+      https://vercel.com</p>
+
+      <h3 style="color:var(--text);margin:16px 0 6px">Données personnelles collectées</h3>
+      <p>Dans le cadre de l'utilisation de DevisiA, les données suivantes sont collectées :<br>
+      • Email et mot de passe (authentification)<br>
+      • Nom, prénom, adresse, SIRET, téléphone (profil entreprise)<br>
+      • Devis et factures créés (données métier)</p>
+
+      <h3 style="color:var(--text);margin:16px 0 6px">Durée de conservation</h3>
+      <p>Les données sont conservées pendant toute la durée d'utilisation du compte, 
+      puis supprimées dans un délai de 30 jours après la résiliation du compte.</p>
+
+      <h3 style="color:var(--text);margin:16px 0 6px">Vos droits (RGPD)</h3>
+      <p>Conformément au RGPD, vous disposez des droits suivants :<br>
+      • <strong>Droit d'accès</strong> : obtenir une copie de vos données<br>
+      • <strong>Droit de rectification</strong> : corriger vos données<br>
+      • <strong>Droit à l'effacement</strong> : supprimer votre compte et vos données<br>
+      • <strong>Droit à la portabilité</strong> : exporter vos données au format CSV<br><br>
+      Pour exercer ces droits : <strong>contact@devisia.art</strong></p>
+
+      <h3 style="color:var(--text);margin:16px 0 6px">Cookies</h3>
+      <p>DevisiA utilise uniquement des cookies techniques nécessaires au fonctionnement 
+      de l'application (session utilisateur). Aucun cookie publicitaire ou de tracking.</p>
+    </div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-ok" onclick="closeModals()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CGU ══ -->
+<div class="overlay" id="m-cgu">
+  <div class="modal" style="width:600px;max-width:95vw;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="modal-title" style="margin-bottom:0">Conditions Générales d'Utilisation</div>
+      <button onclick="closeModals()" style="background:none;border:none;font-size:20px;cursor:pointer">×</button>
+    </div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.7">
+      <h3 style="color:var(--text);margin:16px 0 6px">1. Objet</h3>
+      <p>DevisiA est un service SaaS permettant aux artisans de créer, gérer et envoyer 
+      des devis et factures professionnels. Les présentes CGU définissent les conditions 
+      d'utilisation du service.</p>
+
+      <h3 style="color:var(--text);margin:16px 0 6px">2. Accès au service</h3>
+      <p>L'accès à DevisiA nécessite la création d'un compte. L'utilisateur s'engage 
+      à fournir des informations exactes et à maintenir la confidentialité de ses 
+      identifiants de connexion.</p>
+
+      <h3 style="color:var(--text);margin:16px 0 6px">3. Utilisation</h3>
+      <p>DevisiA est destiné à un usage professionnel. L'utilisateur est seul responsable 
+      des devis et factures qu'il génère et de leur conformité avec la réglementation en vigueur.</p>
+
+      <h3 style="color:var(--text);margin:16px 0 6px">4. Disponibilité</h3>
+      <p>DevisiA s'efforce d'assurer la disponibilité du service 24h/24 et 7j/7, 
+      sans garantie de continuité. Des interruptions pour maintenance peuvent survenir.</p>
+
+      <h3 style="color:var(--text);margin:16px 0 6px">5. Résiliation</h3>
+      <p>L'utilisateur peut supprimer son compte à tout moment depuis les Réglages. 
+      Toutes les données associées seront supprimées dans un délai de 30 jours.</p>
+    </div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-ok" onclick="closeModals()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BANDEAU COOKIE ══ -->
+<div id="cookie-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--border);padding:12px 20px;z-index:9999;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:13px">
+  <span style="color:var(--text2)">🍪 DevisiA utilise des cookies techniques essentiels au fonctionnement de l'app. <a href="#" onclick="document.getElementById('m-mentions').classList.add('open');return false;" style="color:var(--blue)">En savoir plus</a></span>
+  <div style="display:flex;gap:8px">
+    <button onclick="acceptCookies()" style="padding:6px 16px;background:var(--text);color:var(--bg);border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px">Accepter</button>
+    <button onclick="refuseCookies()" style="padding:6px 16px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;color:var(--text)">Refuser</button>
+  </div>
+</div>
+
 </body>
 </html>
