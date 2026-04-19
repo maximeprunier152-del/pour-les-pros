@@ -1113,7 +1113,7 @@ body {
   🧪 <strong>Mode démo</strong> — Vos données sont sauvegardées localement sur cet appareil. <a href="#" onclick="showAuth('login');return false;" style="color:#92400e;font-weight:700;text-decoration:underline">Connectez-vous</a> pour les synchroniser.
 </div>
 
-<aside class="sidebar">
+<aside class="sidebar" id="app-sidebar" style="display:none">
   <div class="logo" style="display:flex;align-items:center;gap:8px">
     <div style="width:28px;height:28px;background:#111;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
       <span style="color:#fff;font-weight:900;font-size:14px;font-family:'Manrope',sans-serif">D<span style="color:#2563eb">A</span></span>
@@ -1132,6 +1132,9 @@ body {
   <button class="nav-item" id="ni-settings" onclick="goPage('settings')">
     <span class="ni">⚙️</span> Réglages
   </button>
+  <button class="nav-item" id="ni-parrainage" onclick="openParrainageModal()" style="background:linear-gradient(135deg,#2563eb22,#16a34a22);border:1px solid #2563eb44">
+    <span class="ni">🎁</span> <span>Parrainer un ami</span>
+  </button>
   <button class="nav-item" id="ni-darkmode" onclick="toggleDarkMode()" style="margin-top:auto">
     <span class="ni" id="dm-icon">🌙</span> <span id="dm-label">Mode sombre</span>
   </button>
@@ -1142,13 +1145,14 @@ body {
       <div class="user-name" id="userName">—</div>
       <div class="user-email" id="userEmail">—</div>
     </div>
+    <button class="btn-logout" onclick="openParrainageModal()" title="Parrainer" style="font-size:14px;padding:4px 6px;color:var(--blue);border-color:var(--blue)">🎁</button>
     <button class="btn-logout" onclick="doLogout()" title="Déconnexion">↩</button>
   </div>
 
 </aside>
 
 <!-- MAIN -->
-<div class="main">
+<div class="main" id="app-main" style="display:none">
 
 <!-- ══════════════ PAGE DEVIS ══════════════ -->
 <div class="page active" id="page-devis">
@@ -1866,6 +1870,7 @@ async function doRegister() {
     const catDefaut = buildCatalogueFromMetiers(selectedMetiers, email);
     await sb.from('catalogue').insert(catDefaut);
 
+    await validerParrainage(email);
     loginSuccess(data);
   } catch(e) {
     showAuthError('Erreur lors de la création. Réessayez.');
@@ -1878,8 +1883,7 @@ async function loginSuccess(user) {
   // Masquer le bandeau démo
   const demoBanner = document.getElementById('demo-banner');
   if (demoBanner) demoBanner.style.display = 'none';
-  const authScr = document.getElementById('authScreen');
-  if(authScr) authScr.classList.add('hidden');
+  showApp();
   if (user.company) {
     ['t-ent','v-ent','f-ent'].forEach(id => {
       const el = document.getElementById(id);
@@ -1913,6 +1917,14 @@ async function loginSuccess(user) {
 }
 
 function doLogout() {
+  const sidebar = document.getElementById('app-sidebar');
+  const main = document.getElementById('app-main');
+  const bottomNav = document.getElementById('bottomNav');
+  if (sidebar) sidebar.style.display = 'none';
+  if (main) main.style.display = 'none';
+  if (bottomNav) bottomNav.style.display = 'none';
+  const landing = document.getElementById('landingPage');
+  if (landing) landing.classList.add('active');
   currentUser = null;
   const authScr2 = document.getElementById('authScreen');
   if(authScr2) authScr2.classList.remove('hidden');
@@ -1927,6 +1939,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDarkMode();
   if (checkSignatureParam()) return;
   initCookieBanner();
+  checkParrainageCode();
 });
 
 // Enregistrement Service Worker PWA
@@ -1960,6 +1973,165 @@ async function sendContactForm() {
     document.getElementById('contact-email').value = '';
     document.getElementById('contact-msg').value = '';
   } catch(e) { toast('❌', "Erreur d'envoi", 'error'); }
+}
+
+// ══ SYSTÈME DE PARRAINAGE ══
+
+function genererCodeParrainage(email) {
+  // Générer un code unique basé sur l'email + random
+  const base = email.split('@')[0].replace(/[^a-zA-Z0-9]/g,'').slice(0,6).toUpperCase();
+  const rand = Math.random().toString(36).slice(2,6).toUpperCase();
+  return base + rand;
+}
+
+async function initParrainage() {
+  if (!currentUser || currentUser._isDemo) return;
+
+  // Générer ou récupérer le code parrainage
+  if (!currentUser.parrain_code) {
+    const code = genererCodeParrainage(currentUser.email);
+    await sb.from('users').update({parrain_code: code}).eq('email', currentUser.email);
+    currentUser.parrain_code = code;
+
+    // Créer l'entrée dans la table parrainages
+    await sb.from('parrainages').insert([{
+      parrain_email: currentUser.email,
+      code: code,
+      status: 'actif'
+    }]).onConflict('code').ignore();
+  }
+}
+
+async function openParrainageModal() {
+  if (!currentUser || currentUser._isDemo) {
+    toast('⚠️', 'Connectez-vous pour parrainer');
+    return;
+  }
+
+  await initParrainage();
+
+  const code = currentUser.parrain_code;
+  const lien = window.location.origin + window.location.pathname + '?ref=' + code;
+  document.getElementById('parrain-link').value = lien;
+
+  // Charger les stats
+  try {
+    const { data: filleuls } = await sb.from('parrainages')
+      .select('*')
+      .eq('parrain_email', currentUser.email);
+
+    const inscrits = (filleuls || []).filter(f => f.status === 'converti').length;
+    const moisOfferts = inscrits; // 1 mois par filleul
+
+    document.getElementById('parrain-count').textContent = inscrits;
+    document.getElementById('parrain-mois').textContent = moisOfferts;
+
+    if (inscrits > 0) {
+      document.getElementById('parrain-filleuls').innerHTML =
+        '<div style="font-weight:600;margin-bottom:8px;font-size:13px;color:var(--text)">Vos filleuls :</div>' +
+        (filleuls || []).filter(f => f.filleul_email).map(f =>
+          `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);font-size:12px">
+            <span>${f.filleul_email}</span>
+            <span style="color:${f.status==='converti'?'var(--green)':'var(--text3)'}">${f.status==='converti'?'✅ Inscrit':'⏳ En attente'}</span>
+          </div>`
+        ).join('');
+    } else {
+      document.getElementById('parrain-filleuls').innerHTML =
+        '<div style="color:var(--text3);font-size:13px">Vous n\'avez pas encore de filleul. Partagez votre lien !</div>';
+    }
+  } catch(e) { console.error(e); }
+
+  document.getElementById('m-parrainage').classList.add('open');
+}
+
+function copierLienParrainage() {
+  const lien = document.getElementById('parrain-link').value;
+  navigator.clipboard.writeText(lien).then(() => {
+    toast('✅', 'Lien copié !', 'success');
+  }).catch(() => {
+    document.getElementById('parrain-link').select();
+    document.execCommand('copy');
+    toast('✅', 'Lien copié !', 'success');
+  });
+}
+
+function partagerParrainageWhatsApp() {
+  const lien = document.getElementById('parrain-link').value;
+  const msg = encodeURIComponent(
+    'Salut ! J\'utilise DevisiA pour mes devis et factures, c\'est super rapide. ' +
+    'Crée ton compte gratuitement avec mon lien et on a tous les deux 1 mois Pro offert : ' + lien
+  );
+  window.open('https://wa.me/?text=' + msg, '_blank');
+}
+
+function partagerParrainageSMS() {
+  const lien = document.getElementById('parrain-link').value;
+  const msg = encodeURIComponent(
+    'Essaie DevisiA pour tes devis et factures - gratuit avec mon lien : ' + lien
+  );
+  window.open('sms:?body=' + msg, '_blank');
+}
+
+function partagerParrainageEmail() {
+  const lien = document.getElementById('parrain-link').value;
+  const sujet = encodeURIComponent('Je t\'invite à essayer DevisiA gratuitement');
+  const corps = encodeURIComponent(
+    'Bonjour,\n\n' +
+    'J\'utilise DevisiA pour créer mes devis et factures en 2 minutes grâce à l\'IA.\n' +
+    'C\'est vraiment pratique pour les artisans !\n\n' +
+    'Inscris-toi gratuitement avec mon lien et on a tous les deux 1 mois Pro offert :\n' +
+    lien + '\n\n' +
+    'Bonne journée !'
+  );
+  window.open('mailto:?subject=' + sujet + '&body=' + corps, '_blank');
+}
+
+// Vérifier au chargement si l'URL contient un code de parrainage
+async function checkParrainageCode() {
+  const params = new URLSearchParams(window.location.search);
+  const refCode = params.get('ref');
+  if (!refCode) return;
+
+  // Stocker le code pour l'utiliser à l'inscription
+  sessionStorage.setItem('parrain_ref', refCode);
+  toast('🎁', 'Lien de parrainage détecté ! Inscrivez-vous pour bénéficier d\'1 mois Pro offert.', 'success');
+}
+
+// Valider le parrainage après inscription
+async function validerParrainage(newUserEmail) {
+  const refCode = sessionStorage.getItem('parrain_ref');
+  if (!refCode) return;
+
+  try {
+    // Trouver le parrain
+    const { data: parrain } = await sb.from('users')
+      .select('email, mois_offerts')
+      .eq('parrain_code', refCode)
+      .single();
+
+    if (!parrain) return;
+
+    // Mettre à jour le parrainage
+    await sb.from('parrainages').update({
+      filleul_email: newUserEmail,
+      status: 'converti',
+      converted_at: new Date().toISOString()
+    }).eq('code', refCode);
+
+    // Offrir 1 mois Pro au parrain
+    await sb.from('users').update({
+      mois_offerts: (parrain.mois_offerts || 0) + 1
+    }).eq('email', parrain.email);
+
+    // Offrir 1 mois Pro au filleul
+    await sb.from('users').update({
+      mois_offerts: 1,
+      parraine_par: refCode
+    }).eq('email', newUserEmail);
+
+    sessionStorage.removeItem('parrain_ref');
+    toast('🎁', '1 mois Pro offert grâce au parrainage !', 'success');
+  } catch(e) { console.error('Parrainage error:', e); }
 }
 
 function initCookieBanner() {
@@ -2051,6 +2223,13 @@ window.validerExtSign = async function(devisId, ent, clientEmail) {
 };
 
 function showAuth(mode) {
+  // Cacher sidebar/main, montrer auth
+  const sidebar = document.getElementById('app-sidebar');
+  const main = document.getElementById('app-main');
+  const bottomNav = document.getElementById('bottomNav');
+  if (sidebar) sidebar.style.display = 'none';
+  if (main) main.style.display = 'none';
+  if (bottomNav) bottomNav.style.display = 'none';
   document.getElementById('landingPage').classList.remove('active');
   document.getElementById('authScreen').style.display = '';
   document.getElementById('authScreen').classList.remove('hidden');
@@ -2075,14 +2254,26 @@ function checkSession() {
   if (authScr) authScr.style.display = 'none';
 }
 
+function showApp() {
+  // Afficher la sidebar + main, cacher landing + auth
+  const sidebar = document.getElementById('app-sidebar');
+  const main = document.getElementById('app-main');
+  const bottomNav = document.getElementById('bottomNav');
+  const landing = document.getElementById('landingPage');
+  const auth = document.getElementById('authScreen');
+
+  if (sidebar) sidebar.style.display = '';
+  if (main) main.style.display = '';
+  if (bottomNav) bottomNav.style.removeProperty("display");
+  if (landing) landing.classList.remove('active');
+  if (auth) auth.classList.add('hidden');
+}
+
 function enterDemoMode() {
   // Mode démo - pas besoin de compte
+  showApp();
   const demoBanner = document.getElementById('demo-banner');
   if (demoBanner) demoBanner.style.display = 'block';
-  const landing = document.getElementById('landingPage');
-  if (landing) landing.classList.remove('active');
-  const authScr = document.getElementById('authScreen');
-  if (authScr) authScr.classList.add('hidden');
 
   // Créer un utilisateur démo
   currentUser = {
@@ -5015,7 +5206,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <!-- ── BOTTOM NAV MOBILE ── -->
-<nav class="bottom-nav" id="bottomNav">
+<nav class="bottom-nav" id="bottomNav" style="display:none">
   <button class="bottom-nav-item active" id="bn-devis" onclick="goPage('devis')">
     <span class="bni">✏️</span>
     <span>Devis</span>
@@ -5042,6 +5233,68 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="bni-dot"></div>
   </button>
 </nav>
+<!-- ══ PARRAINAGE ══ -->
+<div class="overlay" id="m-parrainage">
+  <div class="modal" style="width:500px;max-width:95vw">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div class="modal-title" style="margin-bottom:0">🎁 Parrainer un artisan</div>
+      <button onclick="closeModals()" style="background:none;border:none;font-size:20px;cursor:pointer">×</button>
+    </div>
+
+    <!-- Stats parrainage -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+      <div style="background:var(--bg2);border-radius:10px;padding:14px;text-align:center">
+        <div id="parrain-count" style="font-size:28px;font-weight:900;font-family:'Manrope',sans-serif;color:var(--blue)">0</div>
+        <div style="font-size:12px;color:var(--text3)">Filleuls inscrits</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:10px;padding:14px;text-align:center">
+        <div id="parrain-mois" style="font-size:28px;font-weight:900;font-family:'Manrope',sans-serif;color:var(--green)">0</div>
+        <div style="font-size:12px;color:var(--text3)">Mois Pro offerts</div>
+      </div>
+    </div>
+
+    <!-- Explication -->
+    <div style="background:linear-gradient(135deg,#eff6ff,#f0fdf4);border-radius:12px;padding:16px;margin-bottom:20px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:14px">Comment ça marche ?</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.8">
+        1️⃣ Copiez votre lien de parrainage<br>
+        2️⃣ Envoyez-le à un collègue artisan<br>
+        3️⃣ Il s'inscrit avec votre lien → <strong>1 mois Pro offert pour vous deux</strong> 🎉
+      </div>
+    </div>
+
+    <!-- Lien parrainage -->
+    <div style="margin-bottom:16px">
+      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Votre lien de parrainage</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="parrain-link" readonly
+          style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);font-size:12px;color:var(--text2)">
+        <button onclick="copierLienParrainage()" style="padding:10px 16px;background:var(--text);color:var(--bg);border:none;border-radius:8px;font-weight:600;cursor:pointer;white-space:nowrap">📋 Copier</button>
+      </div>
+    </div>
+
+    <!-- Partage direct -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+      <button onclick="partagerParrainageWhatsApp()" style="padding:10px;background:#25d366;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px">
+        💬 WhatsApp
+      </button>
+      <button onclick="partagerParrainageSMS()" style="padding:10px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px">
+        📱 SMS
+      </button>
+      <button onclick="partagerParrainageEmail()" style="padding:10px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-weight:600;cursor:pointer;font-size:13px">
+        ✉️ Email
+      </button>
+    </div>
+
+    <!-- Liste filleuls -->
+    <div id="parrain-filleuls" style="font-size:13px;color:var(--text3);text-align:center;padding:8px 0">
+      Chargement...
+    </div>
+
+    <button class="btn-cancel" onclick="closeModals()" style="width:100%;margin-top:8px">Fermer</button>
+  </div>
+</div>
+
 <!-- ══ CONTACT ══ -->
 <div class="overlay" id="m-contact">
   <div class="modal" style="width:480px;max-width:95vw">
