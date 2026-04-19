@@ -3123,7 +3123,7 @@ function openEmailModal() {
   if (!devis._pdfBase64) exportPDF();
   document.getElementById('me-email').value=devis.emailCli||'';
   document.getElementById('me-objet').value=`Votre devis ${devis.num} — ${devis.objet}`;
-  document.getElementById('me-msg').value=`Bonjour ${devis.cli},\n\nVeuillez trouver ci-joint votre devis n°${devis.num} d'un montant de ${f(devis.ttc)} € TTC.\n\nCordialement,\n${devis.ent}`;
+  document.getElementById('me-msg').value=`Bonjour ${devis.cli},\n\nVeuillez trouver ci-joint votre devis n°${devis.num} d'un montant de ${f(devis.ttc)} € TTC.\n\nMerci de bien vouloir nous retourner ce devis signé à l'adresse suivante : ${currentUser?.email || devis.ent}\n\nCordialement,\n${devis.ent}`;
   document.getElementById('m-email').classList.add('open');
 }
 async function doSendEmail() {
