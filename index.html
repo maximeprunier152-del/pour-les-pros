@@ -1708,19 +1708,23 @@ body {
 
 <div class="overlay" id="m-cat">
   <div class="modal">
-    <div class="modal-title">Nouvelle prestation</div>
+    <div class="modal-title" id="mc-title">Nouvelle prestation</div>
     <div class="modal-sub">Elle sera disponible dans tous vos devis.</div>
+    <input type="hidden" id="mc-edit-id" value="">
     <div class="field"><label>Nom</label><input type="text" id="mc-name" placeholder="Main d'œuvre horaire"></div>
     <div class="row2">
       <div class="field"><label>Prix HT (€)</label><input type="number" id="mc-prix" placeholder="55"></div>
       <div class="field"><label>Unité</label>
-        <select id="mc-unit"><option>heure</option><option>forfait</option><option>m²</option><option>unité</option><option>jour</option></select>
+        <select id="mc-unit">
+          <option>heure</option><option>forfait</option><option>m²</option>
+          <option>unité</option><option>jour</option><option>ml</option>
+        </select>
       </div>
     </div>
     <div class="field"><label>Catégorie</label><input type="text" id="mc-cat" placeholder="Main d'œuvre"></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModals()">Annuler</button>
-      <button class="btn-ok" onclick="saveCat()">Enregistrer</button>
+      <button class="btn-ok" onclick="saveCat()" id="mc-save-btn">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -3385,31 +3389,68 @@ function renderCat() {
       </div>
       <div class="cat-card-name">${c.name}</div>
       <div class="cat-card-price">${c.prix} €<span class="cat-card-unit"> / ${c.unit}</span></div>
-      <button class="cat-card-del" onclick="delCat(${c.id})">Supprimer</button>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="cat-card-del" style="flex:1" onclick="editCat(${c.id})">✏️ Modifier</button>
+        <button class="cat-card-del" style="flex:1" onclick="delCat(${c.id})">🗑️ Supprimer</button>
+      </div>
     </div>`).join('');
 }
-function openCatModal(){document.getElementById('m-cat').classList.add('open');}
-async function saveCat(){
-  const name=document.getElementById('mc-name').value.trim();
-  const prix=parseFloat(document.getElementById('mc-prix').value)||0;
-  const unit=document.getElementById('mc-unit').value;
-  const cat=document.getElementById('mc-cat').value.trim()||'Général';
-  if(!name) return;
+function openCatModal() {
+  document.getElementById('mc-title').textContent = 'Nouvelle prestation';
+  document.getElementById('mc-edit-id').value = '';
+  document.getElementById('mc-name').value = '';
+  document.getElementById('mc-prix').value = '';
+  document.getElementById('mc-unit').value = 'heure';
+  document.getElementById('mc-cat').value = '';
+  document.getElementById('mc-save-btn').textContent = 'Enregistrer';
+  document.getElementById('m-cat').classList.add('open');
+}
+
+function editCat(id) {
+  const c = catalogue.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('mc-title').textContent = 'Modifier la prestation';
+  document.getElementById('mc-edit-id').value = id;
+  document.getElementById('mc-name').value = c.name;
+  document.getElementById('mc-prix').value = c.prix;
+  document.getElementById('mc-unit').value = c.unit;
+  document.getElementById('mc-cat').value = c.cat || '';
+  document.getElementById('mc-save-btn').textContent = 'Mettre à jour';
+  document.getElementById('m-cat').classList.add('open');
+}
+async function saveCat() {
+  const name = document.getElementById('mc-name').value.trim();
+  const prix = parseFloat(document.getElementById('mc-prix').value) || 0;
+  const unit = document.getElementById('mc-unit').value;
+  const cat = document.getElementById('mc-cat').value.trim() || 'Général';
+  const editId = document.getElementById('mc-edit-id').value;
+  if (!name) { toast('⚠️', 'Le nom est requis'); return; }
 
   closeModals();
 
-  if(currentUser) {
-    // Insérer dans Supabase et attendre la réponse
-    await sb.from('catalogue').insert([{user_email:currentUser.email,name,prix,unit,cat}]);
-    // Recharger depuis Supabase avec les vrais IDs
-    const { data } = await sb.from('catalogue').select('*').eq('user_email',currentUser.email).order('id', {ascending:true});
-    if(data) catalogue = data;
+  if (editId) {
+    // MODE ÉDITION
+    const numId = parseInt(editId) || editId;
+    const idx = catalogue.findIndex(c => c.id == numId);
+    if (idx !== -1) catalogue[idx] = {...catalogue[idx], name, prix, unit, cat};
+    if (currentUser && !currentUser._isDemo) {
+      await sb.from('catalogue').update({name, prix, unit, cat}).eq('id', numId).eq('user_email', currentUser.email);
+    }
+    toast('✅', `"${name}" modifié`, 'success');
   } else {
-    catalogue.push({id:Date.now(),name,prix,unit,cat});
+    // MODE AJOUT
+    if (currentUser && !currentUser._isDemo) {
+      await sb.from('catalogue').insert([{user_email: currentUser.email, name, prix, unit, cat}]);
+      const { data } = await sb.from('catalogue').select('*').eq('user_email', currentUser.email).order('id', {ascending: true});
+      if (data) catalogue = data;
+    } else {
+      catalogue.push({id: Date.now(), name, prix, unit, cat});
+    }
+    toast('📦', `"${name}" ajouté`);
   }
+
   renderCat();
   renderCatChips();
-  toast('📦',`"${name}" ajouté`);
 }
 function delCat(id){
   catalogue=catalogue.filter(c=>c.id!==id);
